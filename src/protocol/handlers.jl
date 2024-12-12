@@ -254,38 +254,42 @@ function handle_request(server::Server, request::Request)::Response
 
     try
         # Convert params to appropriate type based on method
-        typed_params = if request.method == "initialize" && isa(request.params, Dict)
-            InitializeParams(;
-                capabilities = ClientCapabilities(;
-                    get(request.params, "capabilities", Dict{String,Any}())...
-                ),
-                clientInfo = Implementation(
-                    get(request.params, "clientInfo", Dict())...
-                ),
-                protocolVersion = get(request.params, "protocolVersion", "1.0")
+        typed_params = if request.method == "initialize"
+            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
+            capabilities_dict = get(params_dict, "capabilities", Dict{String,Any}())
+            client_info_dict = get(params_dict, "clientInfo", Dict{String,Any}())
+
+            InitializeParams(
+                capabilities = ClientCapabilities(;capabilities_dict...),
+                clientInfo = Implementation(;client_info_dict...),
+                protocolVersion = get(params_dict, "protocolVersion", "1.0")
             )
-        elseif request.method == "resources/list" && isa(request.params, Dict)
+        elseif request.method == "resources/list"
+            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
             ListResourcesParams(
-                cursor = get(request.params, "cursor", nothing)
+                cursor = get(params_dict, "cursor", nothing)
             )
-        elseif request.method == "resources/read" && isa(request.params, Dict)
+        elseif request.method == "resources/read"
+            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
             ReadResourceParams(
-                uri = request.params["uri"]
+                uri = params_dict["uri"]
             )
-        elseif request.method == "tools/call" && isa(request.params, Dict)
+        elseif request.method == "tools/call"
+            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
             CallToolParams(
-                name = request.params["name"],
-                arguments = get(request.params, "arguments", Dict{String,Any}())
+                name = params_dict["name"],
+                arguments = get(params_dict, "arguments", Dict{String,Any}())
             )
-        elseif request.method == "tools/list" && isa(request.params, Dict)
+        elseif request.method == "tools/list"
+            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
             ListToolsParams(
-                cursor = get(request.params, "cursor", nothing)
+                cursor = get(params_dict, "cursor", nothing)
             )
         else
             error("Invalid or missing params for method: $(request.method)")
         end
 
-        # Match on request method with typed params
+        # Handle request with typed parameters
         result = if request.method == "initialize"
             handle_initialize(ctx, typed_params::InitializeParams)
         elseif request.method == "resources/list"

@@ -101,6 +101,13 @@ Base.@kwdef struct ListResourcesResult <: ResponseResult
 end
 
 """
+List tools request parameters
+"""
+Base.@kwdef struct ListToolsParams <: RequestParams
+    cursor::Union{String,Nothing} = nothing
+end
+
+"""
 List tools response result
 """
 Base.@kwdef struct ListToolsResult <: ResponseResult
