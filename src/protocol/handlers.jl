@@ -22,19 +22,11 @@ Base.@kwdef struct HandlerResult
     error::Union{ErrorInfo,Nothing} = nothing
 end
 
-Base.@kwdef struct ListToolsParams
-    cursor::Union{String,Nothing} = nothing
-end
-
 """
 Handles initialization requests
 """
 function handle_initialize(ctx::RequestContext, params::InitializeParams)::HandlerResult
-    
-    client_capabilities = params.capabilities
-    protocol_version = params.protocolVersion
-
-    # Convert our capabilities to protocol format
+    # Convert capabilities to protocol format 
     server_capabilities = capabilities_to_protocol(ctx.server.config.capabilities)
 
     result = InitializeResult(
@@ -43,8 +35,8 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
             "version" => ctx.server.config.version
         ),
         capabilities = server_capabilities,
-        protocolVersion = protocol_version,
-        instructions = ctx.server.config.description  # Optional instructions from config
+        protocolVersion = params.protocolVersion,  # Always use client's version
+        instructions = ctx.server.config.instructions
     )
 
     HandlerResult(
@@ -60,12 +52,12 @@ Handles resource listing requests
 """
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
-        resources = map(ctx.server.resources) do resource
+        resources = map(ctx.server.resources) do resource::MCPResource
             Dict{String,Any}(
-                "uri" => string(resource.uri),
-                "name" => resource.name,
+                "uri" => string(resource.uri),  # We know it's URI, just need to convert to string
+                "name" => resource.name,        # Already String
                 "mimeType" => resource.mime_type,
-                "description" => resource.description,  # Keep only one description field
+                "description" => resource.description,
                 "annotations" => Dict{String,Any}(
                     "audience" => get(resource.annotations, "audience", ["assistant"]),
                     "priority" => get(resource.annotations, "priority", 0.0)
@@ -73,21 +65,19 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
             )
         end
 
-        # Build result with pagination support
         result = ListResourcesResult(
             resources = resources,
-            nextCursor = params.cursor  # Changed from next_cursor to nextCursor
+            nextCursor = params.cursor  # Use keyword arguments
         )
 
-        return HandlerResult(
+        HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
                 result = result
             )
         )
-
     catch e
-        return HandlerResult(
+        HandlerResult(
             error = ErrorInfo(
                 code = ErrorCodes.INTERNAL_ERROR,
                 message = "Failed to list resources: $e"
@@ -100,9 +90,27 @@ end
 Handles resource reading requests
 """
 function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::HandlerResult
-    # Find the resource
-    resource = findfirst(r -> string(r.uri) == params.uri, ctx.server.resources)
+    # Convert the requested URI string to a URI object for comparison
+    request_uri = try
+        URI(params.uri)
+    catch e
+        return HandlerResult(
+            error = ErrorInfo(
+                code = ErrorCodes.INVALID_URI,
+                message = "Invalid URI format: $(params.uri)"
+            )
+        )
+    end
 
+    # Find the resource with matching URI
+    resource = nothing
+    for r in ctx.server.resources
+        if string(r.uri) == string(request_uri)
+            resource = r
+            break
+        end
+    end
+    
     if isnothing(resource)
         return HandlerResult(
             error = ErrorInfo(
@@ -115,26 +123,25 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
     try
         # Call the data provider
         data = resource.data_provider()
+        
+        # Create text resource contents
+        contents = [Dict{String,Any}(
+            "uri" => string(resource.uri),
+            "text" => JSON3.write(data),
+            "mimeType" => resource.mime_type
+        )]
 
-        result = ReadResourceResult(
-            contents = [Dict{String,Any}(
-                "uri" => string(resource.uri),
-                "mimeType" => resource.mime_type,
-                "text" => JSON3.write(data)
-            )]
-        )
-
-        HandlerResult(
+        return HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = result
+                result = ReadResourceResult(contents = contents)
             )
         )
     catch e
-        HandlerResult(
+        return HandlerResult(
             error = ErrorInfo(
                 code = ErrorCodes.INTERNAL_ERROR,
-                message = "Failed to read resource: $(e)"
+                message = "Error reading resource: $(e)"
             )
         )
     end
@@ -144,7 +151,7 @@ end
 Handles tool calls
 """
 function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerResult
-    # Find the tool's index then get the tool
+    # Find the tool by name directly from params.name
     tool_idx = findfirst(t -> t.name == params.name, ctx.server.tools)
     
     if isnothing(tool_idx)
@@ -159,12 +166,12 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     tool = ctx.server.tools[tool_idx]
 
     try
-        # Call the tool handler
+        # Call the tool handler with the arguments from params
         result = tool.handler(params.arguments)
 
-        # Convert result to appropriate format for JSON-RPC response
-        # Create a TextContent with the result converted to JSON
+        # Create content array with tool result
         content = [Dict{String,Any}(
+            "type" => "text",  # Required by schema
             "text" => JSON3.write(result),
             "annotations" => Dict{String,Any}()
         )]
@@ -210,7 +217,10 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
             )
         end
 
-        result = ListToolsResult(tools = tools)
+        result = ListToolsResult(
+            tools = tools,
+            nextCursor = params.cursor  # Use keyword arguments
+        )
 
         HandlerResult(
             response = JSONRPCResponse(
@@ -242,7 +252,7 @@ function handle_notification(ctx::RequestContext, notification::JSONRPCNotificat
         # Handle progress updates
     end
     
-    nothing
+    return nothing
 end
 
 function handle_request(server::Server, request::Request)::Response
@@ -253,53 +263,18 @@ function handle_request(server::Server, request::Request)::Response
     )
 
     try
-        # Convert params to appropriate type based on method
-        typed_params = if request.method == "initialize"
-            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
-            capabilities_dict = get(params_dict, "capabilities", Dict{String,Any}())
-            client_info_dict = get(params_dict, "clientInfo", Dict{String,Any}())
-
-            InitializeParams(
-                capabilities = ClientCapabilities(;capabilities_dict...),
-                clientInfo = Implementation(;client_info_dict...),
-                protocolVersion = get(params_dict, "protocolVersion", "1.0")
-            )
+        # Handle request with already typed parameters
+        result = 
+        if request.method == "initialize"
+            handle_initialize(ctx, request.params::InitializeParams)
         elseif request.method == "resources/list"
-            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
-            ListResourcesParams(
-                cursor = get(params_dict, "cursor", nothing)
-            )
+            handle_list_resources(ctx, request.params::ListResourcesParams)
         elseif request.method == "resources/read"
-            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
-            ReadResourceParams(
-                uri = params_dict["uri"]
-            )
+            handle_read_resource(ctx, request.params::ReadResourceParams)
         elseif request.method == "tools/call"
-            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
-            CallToolParams(
-                name = params_dict["name"],
-                arguments = get(params_dict, "arguments", Dict{String,Any}())
-            )
+            handle_call_tool(ctx, request.params::CallToolParams)
         elseif request.method == "tools/list"
-            params_dict = request.params isa Dict ? request.params : Dict{String,Any}()
-            ListToolsParams(
-                cursor = get(params_dict, "cursor", nothing)
-            )
-        else
-            error("Invalid or missing params for method: $(request.method)")
-        end
-
-        # Handle request with typed parameters
-        result = if request.method == "initialize"
-            handle_initialize(ctx, typed_params::InitializeParams)
-        elseif request.method == "resources/list"
-            handle_list_resources(ctx, typed_params::ListResourcesParams)
-        elseif request.method == "resources/read"
-            handle_read_resource(ctx, typed_params::ReadResourceParams)
-        elseif request.method == "tools/call"
-            handle_call_tool(ctx, typed_params::CallToolParams)
-        elseif request.method == "tools/list"
-            handle_list_tools(ctx, typed_params::ListToolsParams)
+            handle_list_tools(ctx, request.params::ListToolsParams)
         else
             HandlerResult(
                 error = ErrorInfo(
@@ -311,10 +286,7 @@ function handle_request(server::Server, request::Request)::Response
 
         # Return response or error
         if !isnothing(result.error)
-            JSONRPCError(
-                id = ctx.request_id,
-                error = result.error
-            )
+            JSONRPCError(id = ctx.request_id, error = result.error)
         else
             result.response
         end
@@ -330,3 +302,13 @@ function handle_request(server::Server, request::Request)::Response
     end
 end
 
+# Handle empty params case
+function handle_resources_list(server::Server, ::Nothing)
+    # Default implementation for empty params
+    return list_resources(server)
+end
+
+# Handle params case
+function handle_resources_list(server::Server, params::ListResourcesParams)
+    return list_resources(server, params.cursor)
+end

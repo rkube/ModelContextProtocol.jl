@@ -42,18 +42,25 @@ Process an incoming message and generate appropriate response
 """
 function process_message(server::Server, state::ServerState, message::String)::Union{String,Nothing}
     
+    # This goes to logger 
+    # @info "Received message" raw=message
+
     # Parse the incoming message
     parsed = try
         @debug "Parsing message"
         parse_message(message)
     catch e
-        @debug "Parse error" exception=e
+        error_info = ErrorInfo(
+            code = ErrorCodes.PARSE_ERROR,
+            message = "Failed to parse message: $(e)"
+        )
+        # Log the error
+        @error "JSON-RPC error" error_code=ErrorCodes.PARSE_ERROR error_message=error_info.message
+
+        # Return JSON-RPC error response
         return serialize_message(JSONRPCError(
             id = nothing,
-            error = ErrorInfo(
-                code = ErrorCodes.PARSE_ERROR,
-                message = "Failed to parse message: $(e)"
-            )
+            error = error_info
         ))
     end
   
@@ -76,13 +83,18 @@ function process_message(server::Server, state::ServerState, message::String)::U
         else
             nothing
         end
-        
+
+        error_info = ErrorInfo(
+            code = ErrorCodes.INTERNAL_ERROR,
+            message = "Internal server error: $(e)"
+        )
+        # Log the error
+        @error "JSON-RPC error" error_code=ErrorCodes.INTERNAL_ERROR error_message=error_info.message request=parsed
+
+        # Return JSON-RPC error response
         return serialize_message(JSONRPCError(
             id = id,
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Internal server error: $(e)"
-            )
+            error = error_info
         ))
     end
 end
@@ -93,28 +105,21 @@ Main server loop - reads from stdin and writes to stdout
 function run_server_loop(server::Server, state::ServerState)
     state.running = true
     
-    # Set up unbuffered IO
+    @debug "Server loop starting"
     flush(stdout)
     flush(stderr)
     
     while state.running
         try
-            # Read next message
             message = readline()
-            
-            if isempty(message)
-                continue
-            end
-            
-            # Process message
+            @debug "Processing message" raw=message
             response = process_message(server, state, message)
-    
-            # Send response if any
+            
             if !isnothing(response)
+                @debug "Sending response" response=response
                 println(response)
                 flush(stdout)
             end
-            
         catch e
             if e isa InterruptException
                 @info "Server shutting down..."
@@ -146,13 +151,15 @@ Start the server
 """
 function start!(server::Server)::Nothing
     if server.active
+        # Use MCPLogger format for errors
+        @error "Server already running"
         throw(ServerError("Server already running"))
     end
     
     state = ServerState()
     
-    # Set up logging
-    logger = SimpleLogger(stderr)
+    # Set up MCP-compliant logging
+    logger = MCPLogger(stderr, Logging.Info)
     global_logger(logger)
     
     @info "Starting MCP server: $(server.config.name)"
@@ -161,6 +168,7 @@ function start!(server::Server)::Nothing
         run_server_loop(server, state)
     catch e
         server.active = false
+        @error "Server error" exception=e
         rethrow(e)
     finally
         server.active = false

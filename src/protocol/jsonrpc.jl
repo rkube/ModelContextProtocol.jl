@@ -5,6 +5,7 @@ const REQUEST_PARAMS_MAP = Dict{String,Type}(
     "resources/list" => ListResourcesParams,
     "resources/read" => ReadResourceParams,
     "tools/call" => CallToolParams,
+    "tools/list" => ListToolsParams,  # Add this line
     "notifications/progress" => ProgressParams
 )
 
@@ -90,11 +91,14 @@ function parse_request(raw::JSON3.Object)::Request
     method = raw.method
     params_type = get_params_type(method)
     
-    typed_params = if !isnothing(params_type) && haskey(raw, :params) && !isempty(raw.params)
-        JSON3.read(JSON3.write(raw.params), params_type)
+    typed_params = if !isnothing(params_type) && haskey(raw, :params)
+        if isempty(raw.params)
+            params_type()  # Construct default instance instead of nothing
+        else
+            JSON3.read(JSON3.write(raw.params), params_type)
+        end
     else
-        # Return empty Dict for empty params or when no specific type exists
-        Dict{String,Any}()
+        nothing
     end
     
     JSONRPCRequest(
@@ -201,17 +205,17 @@ function serialize_message(msg::MCPMessage)::String
             end
         end
         
-        JSON3.write(dict)
+        return JSON3.write(dict)
         
     elseif msg isa JSONRPCResponse
-        JSON3.write(Dict{String,Any}(
+        return JSON3.write(Dict{String,Any}(
             "jsonrpc" => "2.0",
             "id" => msg.id,
             "result" => msg.result
         ))
         
     elseif msg isa JSONRPCError
-        JSON3.write(Dict{String,Any}(
+        return JSON3.write(Dict{String,Any}(
             "jsonrpc" => "2.0",
             "id" => msg.id,
             "error" => msg.error
@@ -227,7 +231,7 @@ function serialize_message(msg::MCPMessage)::String
             dict["params"] = msg.params
         end
         
-        JSON3.write(dict)
+        return JSON3.write(dict)
     else
         throw(ArgumentError("Unknown message type: $(typeof(msg))"))
     end

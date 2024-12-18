@@ -3,25 +3,29 @@
 using Pkg
 Pkg.activate(@__DIR__)
 
-# Ensure required packages are installed
-let required_packages = ["JSON3", "URIs", "DataStructures"]
-    installed = Pkg.project().dependencies |> keys |> collect
-    missing = setdiff(required_packages, installed)
-    if !isempty(missing)
-        @info "Installing required packages: $(join(missing, ", "))"
-        Pkg.add(missing)
-    end
-end
+# # Ensure required packages are installed
+# let required_packages = ["JSON3", "URIs", "DataStructures"]
+#     installed = Pkg.project().dependencies |> keys |> collect
+#     missing = setdiff(required_packages, installed)
+#     if !isempty(missing)
+#         @info "Installing required packages: $(join(missing, ", "))"
+#         Pkg.add(missing)
+#     end
+# end
 
-# For development, use the local package
-pkg_path = normpath(joinpath(@__DIR__, ".."))
-Pkg.develop(PackageSpec(path=pkg_path))
+# # For development, use the local package
+# pkg_path = normpath(joinpath(@__DIR__, ".."))
+# Pkg.develop(PackageSpec(path=pkg_path))
 
 # Now import all needed packages
 using ModelContextProtocol
 using Dates
 using URIs
 using Logging
+
+# Configure more verbose logging
+logger = MCPLogger(stderr, Logging.Debug)  # Change from Info to Debug
+global_logger(logger)
 
 # Create a resource that provides the current time
 current_time_resource = MCPResource(
@@ -31,7 +35,7 @@ current_time_resource = MCPResource(
     mime_type = "application/json",
     data_provider = () -> Dict(
         "timestamp" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"),
-        "timezone" => string(timezone(now())),
+        "utc_offset" => Dates.value(Dates.Hour(Dates.value(now() - now(UTC)))),
         "unix_timestamp" => Int(floor(datetime2unix(now())))
     )
 )
@@ -94,11 +98,22 @@ function create_time_server()
     
     server = Server(config)
     
-    # Register our resource and tool
+    # Log tool registration
+    @debug "Registering tools for time server"
     register!(server, current_time_resource)
+    @debug "Registered current_time_resource"
     register!(server, format_date_tool)
+    @debug "Registered format_date_tool"
     
     return server
+end
+
+# Add logging to message handling
+function handle_message(server::Server, message::AbstractString)
+    @debug "Received message" message
+    result = process_message(server, ServerState(), message)
+    @debug "Sending response" response=result
+    return result
 end
 
 # Main entry point
@@ -107,7 +122,7 @@ function main()
     server = create_time_server()
     
     # Initialize logging
-    logger = SimpleLogger(stderr, Logging.Info)
+    logger = MCPLogger(stderr, Logging.Info)
     global_logger(logger)
     
     # Start server

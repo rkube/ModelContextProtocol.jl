@@ -53,7 +53,7 @@ end
 Client capabilities struct
 """
 Base.@kwdef struct ClientCapabilities
-    experimental::Union{Dict{String,Any},Nothing} = nothing
+    experimental::Union{Dict{String,Dict{String,Any}},Nothing} = nothing  # Changed type
     roots::Union{Dict{String,Bool},Nothing} = nothing
     sampling::Union{Dict{String,Any},Nothing} = nothing
 end
@@ -71,18 +71,18 @@ Initialize request parameters
 """
 Base.@kwdef struct InitializeParams <: RequestParams
     capabilities::ClientCapabilities = ClientCapabilities()
-    clientInfo::Implementation = Implementation(name="default-client", version="1.0.0")
-    protocolVersion::String = "2024-11-05"
+    clientInfo::Implementation = Implementation()
+    protocolVersion::String      # Removed default - must be provided by client
 end
 
 """
 Initialize response result
 """
 Base.@kwdef struct InitializeResult <: ResponseResult
-    serverInfo::Dict{String,Any}  # Was server_info
-    capabilities::Dict{String,Any}
-    protocolVersion::String       # Was protocol_version  
-    instructions::String = ""
+    serverInfo::Dict{String,Any}         # Contains name and version
+    capabilities::Dict{String,Any}       # Server capabilities
+    protocolVersion::String              # Protocol version string
+    instructions::String = ""            # Optional instructions field
 end
 
 """
@@ -96,14 +96,14 @@ end
 List resources response result
 """
 Base.@kwdef struct ListResourcesResult <: ResponseResult
-    resources::Vector{Dict{String,Any}}
-    nextCursor::Union{String,Nothing} = nothing  # Changed from next_cursor to nextCursor
+    resources::Vector{Dict{String,Any}}  # Array of resource definitions
+    nextCursor::Union{String,Nothing} = nothing
 end
 
 """
 List tools request parameters
 """
-Base.@kwdef struct ListToolsParams <: RequestParams
+Base.@kwdef struct ListToolsParams <: RequestParams 
     cursor::Union{String,Nothing} = nothing
 end
 
@@ -111,8 +111,8 @@ end
 List tools response result
 """
 Base.@kwdef struct ListToolsResult <: ResponseResult
-    tools::Vector{Dict{String,Any}}
-    next_cursor::Union{String,Nothing} = nothing
+    tools::Vector{Dict{String,Any}}      # Array of tool definitions
+    nextCursor::Union{String,Nothing} = nothing
 end
 
 """
@@ -134,7 +134,7 @@ Call tool request parameters
 """
 Base.@kwdef struct CallToolParams <: RequestParams
     name::String
-    arguments::Dict{String,Any} = Dict{String,Any}()
+    arguments::Union{Dict{String,Any},Nothing} = nothing  # Changed from empty Dict
 end
 
 """
@@ -169,7 +169,7 @@ JSON-RPC request message
 Base.@kwdef struct JSONRPCRequest <: Request
     id::RequestId
     method::String
-    params::Union{RequestParams,Dict{String,Any}}
+    params::Union{RequestParams, Nothing}  # Only allow typed params or nothing
     meta::RequestMeta = RequestMeta()
 end
 
