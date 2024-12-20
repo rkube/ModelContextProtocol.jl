@@ -3,20 +3,6 @@
 using Pkg
 Pkg.activate(@__DIR__)
 
-# # Ensure required packages are installed
-# let required_packages = ["JSON3", "URIs", "DataStructures"]
-#     installed = Pkg.project().dependencies |> keys |> collect
-#     missing = setdiff(required_packages, installed)
-#     if !isempty(missing)
-#         @info "Installing required packages: $(join(missing, ", "))"
-#         Pkg.add(missing)
-#     end
-# end
-
-# # For development, use the local package
-# pkg_path = normpath(joinpath(@__DIR__, ".."))
-# Pkg.develop(PackageSpec(path=pkg_path))
-
 # Now import all needed packages
 using ModelContextProtocol
 using Dates
@@ -31,7 +17,7 @@ global_logger(logger)
 current_time_resource = MCPResource(
     uri = URI("time://current"),
     name = "Current Time",
-    description = "Returns the current time",
+    description = "Returns the current time. Use for any time requests.",
     mime_type = "application/json",
     data_provider = () -> Dict(
         "timestamp" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"),
@@ -84,6 +70,20 @@ format_date_tool = MCPTool(
     return_type = Dict{String,Any}
 )
 
+# Create a tool that return the current time and date 
+current_time_tool = MCPTool(
+    name = "current_time",
+    description = "Get the current time and date",
+    parameters = [],
+    handler = function(params)
+        Dict(
+            "current_time" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")
+        )
+    end,
+    return_type = Dict{String,Any}
+)
+
+
 # Create and configure server
 function create_time_server()
     # Create server config with custom capabilities
@@ -107,6 +107,8 @@ function create_time_server()
     @debug "Registered current_time_resource"
     register!(server, format_date_tool)
     @debug "Registered format_date_tool"
+    register!(server, current_time_tool)
+    @debug "Registered current_time_tool"
     
     return server
 end
