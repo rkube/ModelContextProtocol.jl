@@ -27,6 +27,9 @@ include("utils/logging.jl")
 
 # Export all public interfaces
 export 
+    # Main Server Call
+    mcp_server,
+
     # Core types
     Server, ServerConfig,
     Tool, Resource, Capability,

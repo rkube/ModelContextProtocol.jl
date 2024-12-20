@@ -194,6 +194,15 @@ Base.@kwdef struct MCPResource <: Resource
     annotations::Dict{String,Any} = Dict{String,Any}()  # Added annotations field with default empty Dict
 end
 
+function MCPResource(; uri::String,  # Changed to keyword arg
+                     name::String = "", 
+                     description::String = "", 
+                     mime_type::String = "application/json", 
+                     data_provider::Function,
+                     annotations::Dict{String,Any} = Dict{String,Any}())
+    MCPResource(URI(uri), name, description, mime_type, data_provider, annotations)
+end
+
 """
 Resource template as defined in schema
 """
