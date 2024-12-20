@@ -122,16 +122,6 @@ Base.@kwdef struct EmbeddedResource <: Content
 end
 
 """
-Response structure for capabilities including tool and resource listings
-"""
-Base.@kwdef struct CapabilityResponse
-    listChanged::Bool = false
-    subscribe::Union{Bool,Nothing} = nothing
-    tools::Union{Dict{String,Any},Nothing} = nothing  # For tool definitions
-    resources::Union{Vector{Dict{String,Any}},Nothing} = nothing  # For resource listings
-end
-
-"""
 Configuration for an MCP server
 """
 Base.@kwdef struct ServerConfig

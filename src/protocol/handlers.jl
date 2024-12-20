@@ -314,7 +314,8 @@ function handle_request(server::Server, request::Request)::Response
             result.response
         end
     catch e
-        @error "Request handler error" exception=e
+        logger = MCPLogger(stderr)
+        logger.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
         JSONRPCError(
             id = ctx.request_id,
             error = ErrorInfo(
