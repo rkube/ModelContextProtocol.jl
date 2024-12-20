@@ -86,16 +86,19 @@ format_date_tool = MCPTool(
 
 # Create and configure server
 function create_time_server()
+    # Create server config with custom capabilities
     config = ServerConfig(
         name = "time-server",
         version = "1.0.0",
-        description = "Provides current time and date formatting utilities",
+        description = "Provides current time and date formatting utilities. 
+            Client should query server for resources and tools.",
         capabilities = [
             ResourceCapability(list_changed = true, subscribe = true),
             ToolCapability(list_changed = true)
         ]
     )
     
+    # The server will automatically have all base capabilities, merged with your custom ones
     server = Server(config)
     
     # Log tool registration

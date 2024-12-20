@@ -23,19 +23,23 @@ Base.@kwdef struct HandlerResult
 end
 
 """
-Handles initialization requests
+Handle initialization requests with standardized capability broadcasting
 """
 function handle_initialize(ctx::RequestContext, params::InitializeParams)::HandlerResult
-    # Convert capabilities to protocol format 
-    server_capabilities = capabilities_to_protocol(ctx.server.config.capabilities)
-
+    # Get full capabilities including available tools and resources
+    current_capabilities = capabilities_to_protocol(
+        ctx.server.config.capabilities,
+        ctx.server
+    )
+    
+    # Create initialization result
     result = InitializeResult(
         serverInfo = Dict(
             "name" => ctx.server.config.name,
             "version" => ctx.server.config.version
         ),
-        capabilities = server_capabilities,
-        protocolVersion = params.protocolVersion,  # Always use client's version
+        capabilities = current_capabilities,
+        protocolVersion = params.protocolVersion,
         instructions = ctx.server.config.instructions
     )
 
@@ -65,15 +69,20 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
             )
         end
 
-        result = ListResourcesResult(
-            resources = resources,
-            nextCursor = params.cursor  # Use keyword arguments
+        # Create the result dictionary explicitly
+        result_dict = Dict{String,Any}(
+            "resources" => resources
         )
+
+        # Only add nextCursor if it's provided and not null
+        if !isnothing(params.cursor) && params.cursor != ""
+            result_dict["nextCursor"] = params.cursor
+        end
 
         HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = result
+                result = result_dict  # Use the explicitly created dictionary
             )
         )
     catch e
@@ -84,6 +93,21 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
             )
         )
     end
+end
+
+# Update the ListResourcesResult struct to match schema requirements
+Base.@kwdef struct ListResourcesResult <: ResponseResult
+    resources::Vector{Dict{String,Any}}
+    nextCursor::Union{String,Nothing} = nothing
+end
+
+# Add JSON serialization method that omits null nextCursor
+function JSON3.write(io::IO, result::ListResourcesResult)
+    dict = Dict{String,Any}("resources" => result.resources)
+    if !isnothing(result.nextCursor)
+        dict["nextCursor"] = result.nextCursor
+    end
+    JSON3.write(io, dict)
 end
 
 """
@@ -203,7 +227,7 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
         tools = map(ctx.server.tools) do tool
             Dict{String,Any}(
                 "name" => tool.name,
-                "description" => tool.description,
+                "description" => tool.description,  # Move description before inputSchema
                 "inputSchema" => Dict{String,Any}(
                     "type" => "object",
                     "properties" => Dict(
@@ -217,9 +241,8 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
             )
         end
 
-        result = ListToolsResult(
-            tools = tools,
-            nextCursor = params.cursor  # Use keyword arguments
+        result = Dict{String,Any}(
+            "tools" => tools  # Remove nextCursor
         )
 
         HandlerResult(

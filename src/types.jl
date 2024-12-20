@@ -1,10 +1,31 @@
 # src/types.jl
 
+import Base: merge
+
 """
 Base type for all MCP protocol capabilities.
 Implementations should include configuration for specific protocol features.
 """
 abstract type Capability end
+
+# Add capability merging function
+function merge_capabilities(base::Vector{Capability}, override::Vector{Capability})::Vector{Capability}
+    result = copy(base)
+    
+    for cap in override
+        # Find matching capability type in result
+        idx = findfirst(x -> typeof(x) == typeof(cap), result)
+        if !isnothing(idx)
+            # Replace existing capability
+            result[idx] = cap
+        else
+            # Add new capability type
+            push!(result, cap)
+        end
+    end
+    
+    return result
+end
 
 """
 Base type for all MCP tools.
@@ -101,6 +122,16 @@ Base.@kwdef struct EmbeddedResource <: Content
 end
 
 """
+Response structure for capabilities including tool and resource listings
+"""
+Base.@kwdef struct CapabilityResponse
+    listChanged::Bool = false
+    subscribe::Union{Bool,Nothing} = nothing
+    tools::Union{Dict{String,Any},Nothing} = nothing  # For tool definitions
+    resources::Union{Vector{Dict{String,Any}},Nothing} = nothing  # For resource listings
+end
+
+"""
 Configuration for an MCP server
 """
 Base.@kwdef struct ServerConfig
@@ -109,6 +140,24 @@ Base.@kwdef struct ServerConfig
     description::String = ""
     capabilities::Vector{Capability} = Capability[]
     instructions::String = ""
+
+    # Inner constructor to ensure capabilities are properly initialized
+    function ServerConfig(name::String, version::String="1.0.0", 
+                        description::String="", capabilities::Vector{Capability}=Capability[],
+                        instructions::String="")
+        # Always ensure we have the basic capabilities
+        base_capabilities = [
+            ResourceCapability(list_changed=true, subscribe=true),
+            ToolCapability(list_changed=true),
+            PromptCapability(list_changed=true),
+            LoggingCapability()
+        ]
+        
+        # Merge with provided capabilities, allowing overrides
+        final_capabilities = merge_capabilities(base_capabilities, capabilities)
+        
+        new(name, version, description, final_capabilities, instructions)
+    end
 end
 
 """
