@@ -36,11 +36,16 @@ export
     ToolParameter, MCPTool, MCPResource, 
     Content, TextContent, ImageContent,
     
+    # Prompt types
+    PromptArgument, MCPPrompt, PromptMessage,
+    ListPromptsParams, GetPromptParams,
+    ListPromptsResult, GetPromptResult,
+    
     # Server operations
     start!, stop!, register!,
     
     # Capabilities
-    ResourceCapability, ToolCapability,
+    ResourceCapability, ToolCapability, PromptCapability,
     
     # Server management
     subscribe!, unsubscribe!,

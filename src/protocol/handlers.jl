@@ -52,14 +52,120 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
 end
 
 """
+Handles prompt listing requests
+"""
+function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::HandlerResult
+    try
+        prompts = map(ctx.server.prompts) do prompt::MCPPrompt
+            Dict{String,Any}(
+                "name" => prompt.name,
+                "description" => prompt.description,
+                "arguments" => [Dict{String,Any}(
+                    "name" => arg.name,
+                    "description" => arg.description,
+                    "required" => arg.required
+                ) for arg in prompt.arguments]
+            )
+        end
+
+        result = Dict{String,Any}(
+            "prompts" => prompts
+        )
+
+        # Only add nextCursor if provided
+        if !isnothing(params.cursor) && params.cursor != ""
+            result["nextCursor"] = params.cursor
+        end
+
+        HandlerResult(
+            response = JSONRPCResponse(
+                id = ctx.request_id,
+                result = result
+            )
+        )
+    catch e
+        HandlerResult(
+            error = ErrorInfo(
+                code = ErrorCodes.INTERNAL_ERROR,
+                message = "Failed to list prompts: $e"
+            )
+        )
+    end
+end
+
+"""
+Handles get prompt requests
+"""
+function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::HandlerResult
+    try
+        # Find the prompt
+        prompt_idx = findfirst(p -> p.name == params.name, ctx.server.prompts)
+        
+        if isnothing(prompt_idx)
+            return HandlerResult(
+                error = ErrorInfo(
+                    code = ErrorCodes.NOT_FOUND,
+                    message = "Prompt not found: $(params.name)"
+                )
+            )
+        end
+
+        prompt = ctx.server.prompts[prompt_idx]
+        
+        # Validate required arguments
+        if !isnothing(params.arguments)
+            missing_args = filter(arg -> arg.required && !haskey(params.arguments, arg.name), 
+                               prompt.arguments)
+            
+            if !isempty(missing_args)
+                return HandlerResult(
+                    error = ErrorInfo(
+                        code = ErrorCodes.INVALID_PARAMS,
+                        message = "Missing required arguments: $(join(map(a -> a.name, missing_args), ", "))"
+                    )
+                )
+            end
+        end
+        
+        # Generate prompt content using template provider
+        content = prompt.template_provider(params.arguments)
+        
+        result = Dict{String,Any}(
+            "description" => prompt.description,
+            "messages" => [Dict{String,Any}(
+                "role" => "assistant",
+                "content" => Dict{String,Any}(
+                    "type" => "text",
+                    "text" => content
+                )
+            )]
+        )
+
+        HandlerResult(
+            response = JSONRPCResponse(
+                id = ctx.request_id,
+                result = result
+            )
+        )
+    catch e
+        HandlerResult(
+            error = ErrorInfo(
+                code = ErrorCodes.INTERNAL_ERROR,
+                message = "Failed to get prompt: $e"
+            )
+        )
+    end
+end
+
+"""
 Handles resource listing requests
 """
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
         resources = map(ctx.server.resources) do resource::MCPResource
             Dict{String,Any}(
-                "uri" => string(resource.uri),  # We know it's URI, just need to convert to string
-                "name" => resource.name,        # Already String
+                "uri" => string(resource.uri),  
+                "name" => resource.name,        
                 "mimeType" => resource.mime_type,
                 "description" => resource.description,
                 "annotations" => Dict{String,Any}(
@@ -82,7 +188,7 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
         HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = result_dict  # Use the explicitly created dictionary
+                result = result_dict
             )
         )
     catch e
@@ -93,21 +199,6 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
             )
         )
     end
-end
-
-# Update the ListResourcesResult struct to match schema requirements
-Base.@kwdef struct ListResourcesResult <: ResponseResult
-    resources::Vector{Dict{String,Any}}
-    nextCursor::Union{String,Nothing} = nothing
-end
-
-# Add JSON serialization method that omits null nextCursor
-function JSON3.write(io::IO, result::ListResourcesResult)
-    dict = Dict{String,Any}("resources" => result.resources)
-    if !isnothing(result.nextCursor)
-        dict["nextCursor"] = result.nextCursor
-    end
-    JSON3.write(io, dict)
 end
 
 """
@@ -158,7 +249,7 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
         return HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = ReadResourceResult(contents = contents)
+                result = Dict("contents" => contents)
             )
         )
     catch e
@@ -175,7 +266,7 @@ end
 Handles tool calls
 """
 function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerResult
-    # Find the tool by name directly from params.name
+    # Find the tool by name
     tool_idx = findfirst(t -> t.name == params.name, ctx.server.tools)
     
     if isnothing(tool_idx)
@@ -190,12 +281,12 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     tool = ctx.server.tools[tool_idx]
 
     try
-        # Call the tool handler with the arguments from params
+        # Call the tool handler with the arguments
         result = tool.handler(params.arguments)
 
         # Create content array with tool result
         content = [Dict{String,Any}(
-            "type" => "text",  # Required by schema
+            "type" => "text",
             "text" => JSON3.write(result),
             "annotations" => Dict{String,Any}()
         )]
@@ -203,9 +294,9 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = CallToolResult(
-                    content = content,
-                    is_error = false
+                result = Dict(
+                    "content" => content,
+                    "isError" => false
                 )
             )
         )
@@ -227,7 +318,7 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
         tools = map(ctx.server.tools) do tool
             Dict{String,Any}(
                 "name" => tool.name,
-                "description" => tool.description,  # Move description before inputSchema
+                "description" => tool.description,
                 "inputSchema" => Dict{String,Any}(
                     "type" => "object",
                     "properties" => Dict(
@@ -242,7 +333,7 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
         end
 
         result = Dict{String,Any}(
-            "tools" => tools  # Remove nextCursor
+            "tools" => tools
         )
 
         HandlerResult(
@@ -298,6 +389,10 @@ function handle_request(server::Server, request::Request)::Response
             handle_call_tool(ctx, request.params::CallToolParams)
         elseif request.method == "tools/list"
             handle_list_tools(ctx, request.params::ListToolsParams)
+        elseif request.method == "prompts/list"
+            handle_list_prompts(ctx, request.params::ListPromptsParams)
+        elseif request.method == "prompts/get"
+            handle_get_prompt(ctx, request.params::GetPromptParams)
         else
             HandlerResult(
                 error = ErrorInfo(
@@ -324,15 +419,4 @@ function handle_request(server::Server, request::Request)::Response
             )
         )
     end
-end
-
-# Handle empty params case
-function handle_resources_list(server::Server, ::Nothing)
-    # Default implementation for empty params
-    return list_resources(server)
-end
-
-# Handle params case
-function handle_resources_list(server::Server, params::ListResourcesParams)
-    return list_resources(server, params.cursor)
 end

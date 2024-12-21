@@ -5,7 +5,9 @@ const REQUEST_PARAMS_MAP = Dict{String,Type}(
     "resources/list" => ListResourcesParams,
     "resources/read" => ReadResourceParams,
     "tools/call" => CallToolParams,
-    "tools/list" => ListToolsParams,  # Add this line
+    "tools/list" => ListToolsParams,
+    "prompts/list" => ListPromptsParams,
+    "prompts/get" => GetPromptParams,
     "notifications/progress" => ProgressParams
 )
 

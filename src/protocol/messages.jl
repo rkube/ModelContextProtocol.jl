@@ -53,7 +53,7 @@ end
 Client capabilities struct
 """
 Base.@kwdef struct ClientCapabilities
-    experimental::Union{Dict{String,Dict{String,Any}},Nothing} = nothing  # Changed type
+    experimental::Union{Dict{String,Dict{String,Any}},Nothing} = nothing
     roots::Union{Dict{String,Bool},Nothing} = nothing
     sampling::Union{Dict{String,Any},Nothing} = nothing
 end
@@ -72,17 +72,17 @@ Initialize request parameters
 Base.@kwdef struct InitializeParams <: RequestParams
     capabilities::ClientCapabilities = ClientCapabilities()
     clientInfo::Implementation = Implementation()
-    protocolVersion::String      # Removed default - must be provided by client
+    protocolVersion::String
 end
 
 """
 Initialize response result
 """
 Base.@kwdef struct InitializeResult <: ResponseResult
-    serverInfo::Dict{String,Any}         # Contains name and version
-    capabilities::Dict{String,Any}       # Server capabilities
-    protocolVersion::String              # Protocol version string
-    instructions::String = ""            # Optional instructions field
+    serverInfo::Dict{String,Any}
+    capabilities::Dict{String,Any}
+    protocolVersion::String
+    instructions::String = ""
 end
 
 """
@@ -96,7 +96,7 @@ end
 List resources response result
 """
 Base.@kwdef struct ListResourcesResult <: ResponseResult
-    resources::Vector{Dict{String,Any}}  # Array of resource definitions
+    resources::Vector{Dict{String,Any}}
     nextCursor::Union{String,Nothing} = nothing
 end
 
@@ -111,7 +111,7 @@ end
 List tools response result
 """
 Base.@kwdef struct ListToolsResult <: ResponseResult
-    tools::Vector{Dict{String,Any}}      # Array of tool definitions
+    tools::Vector{Dict{String,Any}}
     nextCursor::Union{String,Nothing} = nothing
 end
 
@@ -134,7 +134,7 @@ Call tool request parameters
 """
 Base.@kwdef struct CallToolParams <: RequestParams
     name::String
-    arguments::Union{Dict{String,Any},Nothing} = nothing  # Changed from empty Dict
+    arguments::Union{Dict{String,Any},Nothing} = nothing
 end
 
 """
@@ -155,6 +155,37 @@ Base.@kwdef struct ProgressParams <: RequestParams
 end
 
 """
+List prompts request parameters
+"""
+Base.@kwdef struct ListPromptsParams <: RequestParams
+    cursor::Union{String,Nothing} = nothing
+end
+
+"""
+List prompts response result
+"""
+Base.@kwdef struct ListPromptsResult <: ResponseResult
+    prompts::Vector{Dict{String,Any}}
+    nextCursor::Union{String,Nothing} = nothing
+end
+
+"""
+Get prompt request parameters
+"""
+Base.@kwdef struct GetPromptParams <: RequestParams
+    name::String
+    arguments::Union{Dict{String,String},Nothing} = nothing
+end
+
+"""
+Get prompt response result
+"""
+Base.@kwdef struct GetPromptResult <: ResponseResult
+    description::String
+    messages::Vector{PromptMessage}
+end
+
+"""
 Error information for JSON-RPC error responses
 """
 Base.@kwdef struct ErrorInfo
@@ -169,7 +200,7 @@ JSON-RPC request message
 Base.@kwdef struct JSONRPCRequest <: Request
     id::RequestId
     method::String
-    params::Union{RequestParams, Nothing}  # Only allow typed params or nothing
+    params::Union{RequestParams, Nothing}
     meta::RequestMeta = RequestMeta()
 end
 
@@ -189,6 +220,14 @@ Base.@kwdef struct JSONRPCError <: Response
     error::ErrorInfo
 end
 
+"""
+JSON-RPC notification message (no response expected)
+"""
+Base.@kwdef struct JSONRPCNotification <: Notification
+    method::String
+    params::Union{RequestParams,Dict{String,Any}}
+end
+
 # Add StructTypes support for JSON serialization
 StructTypes.StructType(::Type{ClientCapabilities}) = StructTypes.Struct()
 StructTypes.StructType(::Type{Implementation}) = StructTypes.Struct()
@@ -196,6 +235,8 @@ StructTypes.StructType(::Type{InitializeParams}) = StructTypes.Struct()
 StructTypes.StructType(::Type{RequestMeta}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ErrorInfo}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ListResourcesParams}) = StructTypes.Struct()
+StructTypes.StructType(::Type{ListPromptsParams}) = StructTypes.Struct()
+StructTypes.StructType(::Type{GetPromptParams}) = StructTypes.Struct()
 StructTypes.StructType(::Type{T}) where {T<:RequestParams} = StructTypes.Struct()
 StructTypes.StructType(::Type{T}) where {T<:ResponseResult} = StructTypes.Struct()
 
@@ -204,12 +245,8 @@ function StructTypes.omitempties(::Type{ClientCapabilities})
     (:experimental, :roots, :sampling)
 end
 
-"""
-JSON-RPC notification message (no response expected)
-"""
-Base.@kwdef struct JSONRPCNotification <: Notification
-    method::String
-    params::Union{RequestParams,Dict{String,Any}}
+function StructTypes.omitempties(::Type{ListPromptsResult})
+    (:nextCursor,)
 end
 
 # Error codes as specified in the JSON-RPC spec
@@ -224,4 +261,5 @@ module ErrorCodes
     const RESOURCE_NOT_FOUND = -32000
     const TOOL_NOT_FOUND = -32001
     const INVALID_URI = -32002
+    const PROMPT_NOT_FOUND = -32003  # Added for prompts
 end

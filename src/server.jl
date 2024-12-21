@@ -20,9 +20,9 @@ struct ServerError <: Exception
 end
 
 """
-    register!(server::Server, component::Union{Tool,Resource})
+    register!(server::Server, component::Union{Tool,Resource,MCPPrompt})
 
-Register a tool or resource with the server.
+Register a tool, resource, or prompt with the server.
 """
 function register! end
 
@@ -36,15 +36,15 @@ function register!(server::Server, resource::Resource)
     server
 end
 
+function register!(server::Server, prompt::MCPPrompt)
+    push!(server.prompts, prompt)
+    server
+end
 
 """
 Process an incoming message and generate appropriate response
 """
 function process_message(server::Server, state::ServerState, message::String)::Union{String,Nothing}
-    
-    # This goes to logger 
-    # @info "Received message" raw=message
-
     # Parse the incoming message
     parsed = try
         @debug "Parsing message"
@@ -215,13 +215,13 @@ Return the default set of server capabilities.
 function default_capabilities()
     [
         ResourceCapability(list_changed=true, subscribe=true),
-        ToolCapability(list_changed=true)
+        ToolCapability(list_changed=true),
+        PromptCapability(list_changed=true)  # Added prompt capability
     ]
 end
 
-
 """
-    mcp_server(; name, version="1.0.0", tools=nothing, resources=nothing, description="") -> Server
+    mcp_server(; name, version="1.0.0", tools=nothing, resources=nothing, prompts=nothing, description="") -> Server
 
 Create and configure an MCP server with the given components.
 """
@@ -230,6 +230,7 @@ function mcp_server(;
     version::String = "1.0.0", 
     tools::Union{Vector{MCPTool}, MCPTool, Nothing} = nothing,
     resources::Union{Vector{MCPResource}, MCPResource, Nothing} = nothing,
+    prompts::Union{Vector{MCPPrompt}, MCPPrompt, Nothing} = nothing,  # Added prompts parameter
     description::String = "",
     capabilities::Vector{Capability} = default_capabilities()
 )
@@ -254,7 +255,10 @@ function mcp_server(;
         foreach(r -> register!(server, r), resources isa Vector ? resources : [resources])
     end
     
+    # Register prompts if provided
+    if !isnothing(prompts)
+        foreach(p -> register!(server, p), prompts isa Vector ? prompts : [prompts])
+    end
+    
     return server
 end
-
-

@@ -8,6 +8,13 @@ Implementations should include configuration for specific protocol features.
 """
 abstract type Capability end
 
+"""
+Capability for prompt-related features
+"""
+Base.@kwdef struct PromptCapability <: Capability
+    list_changed::Bool = false
+end
+
 # Add capability merging function
 function merge_capabilities(base::Vector{Capability}, override::Vector{Capability})::Vector{Capability}
     result = copy(base)
@@ -122,6 +129,33 @@ Base.@kwdef struct EmbeddedResource <: Content
 end
 
 """
+Describes an argument that a prompt can accept
+"""
+Base.@kwdef struct PromptArgument
+    name::String
+    description::String = ""
+    required::Bool = false
+end
+
+"""
+A prompt or prompt template that the server offers
+"""
+Base.@kwdef struct MCPPrompt
+    name::String
+    description::String = ""
+    arguments::Vector{PromptArgument} = PromptArgument[]
+    template_provider::Function  # Function that returns the prompt text given arguments
+end
+
+"""
+Represents a message returned as part of a prompt
+"""
+Base.@kwdef struct PromptMessage
+    content::Union{TextContent, ImageContent, EmbeddedResource}
+    role::Role
+end
+
+"""
 Configuration for an MCP server
 """
 Base.@kwdef struct ServerConfig
@@ -232,6 +266,7 @@ mutable struct Server
     resource_templates::Vector{ResourceTemplate}
     subscriptions::DefaultDict{String,Vector{Subscription}}
     progress_trackers::Dict{Union{String,Int}, Progress}
+    prompts::Vector{MCPPrompt}  # Add prompts field
     active::Bool
     
     function Server(config::ServerConfig)
@@ -242,6 +277,7 @@ mutable struct Server
             ResourceTemplate[],
             DefaultDict{String,Vector{Subscription}}(() -> Subscription[]),
             Dict{Union{String,Int}, Progress}(),
+            MCPPrompt[],  # Initialize prompts vector
             false
         )
     end
