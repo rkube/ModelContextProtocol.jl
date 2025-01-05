@@ -1,38 +1,12 @@
 # src/types.jl
 
-import Base: merge
+#= Base Abstract Types =#
 
 """
 Base type for all MCP protocol capabilities.
 Implementations should include configuration for specific protocol features.
 """
 abstract type Capability end
-
-"""
-Capability for prompt-related features
-"""
-Base.@kwdef struct PromptCapability <: Capability
-    list_changed::Bool = false
-end
-
-# Add capability merging function
-function merge_capabilities(base::Vector{Capability}, override::Vector{Capability})::Vector{Capability}
-    result = copy(base)
-    
-    for cap in override
-        # Find matching capability type in result
-        idx = findfirst(x -> typeof(x) == typeof(cap), result)
-        if !isnothing(idx)
-            # Replace existing capability
-            result[idx] = cap
-        else
-            # Add new capability type
-            push!(result, cap)
-        end
-    end
-    
-    return result
-end
 
 """
 Base type for all MCP tools.
@@ -46,114 +20,7 @@ Resources represent data that can be read by clients.
 """
 abstract type Resource end
 
-"""
-Represents a role in the MCP protocol (user or assistant)
-"""
-@enum Role user assistant
-
-"""
-Base type for content that can be sent or received
-"""
-abstract type Content end
-
-"""
-Text content with required type field and optional annotations
-"""
-Base.@kwdef struct TextContent <: Content
-    type::String = "text"  # Schema requires this to be const "text"
-    text::String
-    annotations::Dict{String,Any} = Dict{String,Any}()
-
-    function TextContent(type::String, text::String, annotations::Dict{String,Any} = Dict{String,Any}())
-        if type != "text"
-            throw(ArgumentError("TextContent type must be 'text'"))
-        end
-        new(type, text, annotations)
-    end
-end
-
-"""
-Image content with required type and MIME type fields
-"""
-Base.@kwdef struct ImageContent <: Content
-    type::String = "image"  # Schema requires this to be const "image"
-    data::Vector{UInt8}
-    mime_type::String
-    annotations::Dict{String,Any} = Dict{String,Any}()
-
-    function ImageContent(type::String, data::Vector{UInt8}, mime_type::String, annotations::Dict{String,Any} = Dict{String,Any}())
-        if type != "image"
-            throw(ArgumentError("ImageContent type must be 'image'"))
-        end
-        new(type, data, mime_type, annotations)
-    end
-end
-
-"""
-Base type for resource contents
-"""
-abstract type ResourceContents end
-
-"""
-Text-based resource contents
-"""
-Base.@kwdef struct TextResourceContents <: ResourceContents
-    uri::String
-    text::String
-    mime_type::Union{String,Nothing} = nothing
-end
-
-"""
-Binary resource contents
-"""
-Base.@kwdef struct BlobResourceContents <: ResourceContents
-    uri::String
-    blob::Vector{UInt8}
-    mime_type::Union{String,Nothing} = nothing
-end
-
-"""
-Embedded resource content as defined in schema
-"""
-Base.@kwdef struct EmbeddedResource <: Content
-    type::String = "resource"  # Schema requires this to be const "resource"
-    resource::Union{TextResourceContents, BlobResourceContents}
-    annotations::Dict{String,Any} = Dict{String,Any}()
-
-    function EmbeddedResource(type::String, resource::Union{TextResourceContents, BlobResourceContents}, annotations::Dict{String,Any} = Dict{String,Any}())
-        if type != "resource"
-            throw(ArgumentError("EmbeddedResource type must be 'resource'"))
-        end
-        new(type, resource, annotations)
-    end
-end
-
-"""
-Describes an argument that a prompt can accept
-"""
-Base.@kwdef struct PromptArgument
-    name::String
-    description::String = ""
-    required::Bool = false
-end
-
-"""
-A prompt or prompt template that the server offers
-"""
-Base.@kwdef struct MCPPrompt
-    name::String
-    description::String = ""
-    arguments::Vector{PromptArgument} = PromptArgument[]
-    template_provider::Function  # Function that returns the prompt text given arguments
-end
-
-"""
-Represents a message returned as part of a prompt
-"""
-Base.@kwdef struct PromptMessage
-    content::Union{TextContent, ImageContent, EmbeddedResource}
-    role::Role
-end
+#= Server Configuration Types =#
 
 """
 Configuration for an MCP server
@@ -164,25 +31,9 @@ Base.@kwdef struct ServerConfig
     description::String = ""
     capabilities::Vector{Capability} = Capability[]
     instructions::String = ""
-
-    # Inner constructor to ensure capabilities are properly initialized
-    function ServerConfig(name::String, version::String="1.0.0", 
-                        description::String="", capabilities::Vector{Capability}=Capability[],
-                        instructions::String="")
-        # Always ensure we have the basic capabilities
-        base_capabilities = [
-            ResourceCapability(list_changed=true, subscribe=true),
-            ToolCapability(list_changed=true),
-            PromptCapability(list_changed=true),
-            LoggingCapability()
-        ]
-        
-        # Merge with provided capabilities, allowing overrides
-        final_capabilities = merge_capabilities(base_capabilities, capabilities)
-        
-        new(name, version, description, final_capabilities, instructions)
-    end
 end
+
+#= Tool Implementation Types =#
 
 """
 Structure holding metadata about a tool parameter
@@ -206,6 +57,19 @@ Base.@kwdef struct MCPTool <: Tool
     return_type::Type = Any
 end
 
+#= Prompt Types =#
+
+"""
+Implementation of a prompt or prompt template as defined in the MCP schema.
+"""
+Base.@kwdef struct MCPPrompt
+    name::String
+    description::String = ""
+    arguments::Vector{PromptArgument} = PromptArgument[]
+end
+
+#= Resource Implementation Types =#
+
 """
 Structure defining a resource implementation
 """
@@ -215,16 +79,7 @@ Base.@kwdef struct MCPResource <: Resource
     description::String = ""
     mime_type::String = "application/json"
     data_provider::Function
-    annotations::Dict{String,Any} = Dict{String,Any}()  # Added annotations field with default empty Dict
-end
-
-function MCPResource(; uri::String,  # Changed to keyword arg
-                     name::String = "", 
-                     description::String = "", 
-                     mime_type::String = "application/json", 
-                     data_provider::Function,
-                     annotations::Dict{String,Any} = Dict{String,Any}())
-    MCPResource(URI(uri), name, description, mime_type, data_provider, annotations)
+    annotations::Dict{String,Any} = Dict{String,Any}()
 end
 
 """
@@ -236,6 +91,8 @@ Base.@kwdef struct ResourceTemplate
     mime_type::Union{String,Nothing} = nothing
     description::String = ""
 end
+
+#= Subscription and Progress Types =#
 
 """
 Represents subscriptions to resource updates
@@ -256,6 +113,8 @@ Base.@kwdef struct Progress
     message::Union{String,Nothing} = nothing
 end
 
+#= Server Implementation Types =#
+
 """
 Represents a running MCP server instance
 """
@@ -263,10 +122,10 @@ mutable struct Server
     config::ServerConfig
     resources::Vector{Resource}
     tools::Vector{Tool}
+    prompts::Vector{MCPPrompt}
     resource_templates::Vector{ResourceTemplate}
     subscriptions::DefaultDict{String,Vector{Subscription}}
     progress_trackers::Dict{Union{String,Int}, Progress}
-    prompts::Vector{MCPPrompt}  # Add prompts field
     active::Bool
     
     function Server(config::ServerConfig)
@@ -274,26 +133,13 @@ mutable struct Server
             config,
             Resource[],
             Tool[],
+            MCPPrompt[],
             ResourceTemplate[],
             DefaultDict{String,Vector{Subscription}}(() -> Subscription[]),
             Dict{Union{String,Int}, Progress}(),
-            MCPPrompt[],  # Initialize prompts vector
             false
         )
     end
-end
-
-# Helper constructors for content types
-function text_content(text::String, annotations::Dict{String,Any} = Dict{String,Any}())
-    TextContent(type="text", text=text, annotations=annotations)
-end
-
-function image_content(data::Vector{UInt8}, mime_type::String, annotations::Dict{String,Any} = Dict{String,Any}())
-    ImageContent(type="image", data=data, mime_type=mime_type, annotations=annotations)
-end
-
-function embedded_resource(resource::Union{TextResourceContents, BlobResourceContents}, annotations::Dict{String,Any} = Dict{String,Any}())
-    EmbeddedResource(type="resource", resource=resource, annotations=annotations)
 end
 
 # Pretty printing

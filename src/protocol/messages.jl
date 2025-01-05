@@ -1,5 +1,13 @@
 # src/protocol/messages.jl
 
+#= Core Protocol Types =#
+
+"""
+Represents a role in the MCP protocol (user or assistant)
+"""
+@enum Role user assistant
+
+
 """
 JSON-RPC request ID - can be string or integer
 """
@@ -42,6 +50,64 @@ Base type for all response results
 """
 abstract type ResponseResult end
 
+#= Common Protocol Structures =#
+
+"""
+Base type for content that can be sent or received
+"""
+abstract type Content end
+
+"""
+Text content with required type field and optional annotations
+"""
+Base.@kwdef struct TextContent <: Content
+    type::String = "text"  # Schema requires this to be const "text"
+    text::String
+    annotations::Dict{String,Any} = Dict{String,Any}()
+end
+
+"""
+Image content with required type and MIME type fields
+"""
+Base.@kwdef struct ImageContent <: Content
+    type::String = "image"  # Schema requires this to be const "image"
+    data::Vector{UInt8}
+    mime_type::String
+    annotations::Dict{String,Any} = Dict{String,Any}()
+end
+
+"""
+Base type for resource contents
+"""
+abstract type ResourceContents end
+
+"""
+Text-based resource contents
+"""
+Base.@kwdef struct TextResourceContents <: ResourceContents
+    uri::String
+    text::String
+    mime_type::Union{String,Nothing} = nothing
+end
+
+"""
+Binary resource contents
+"""
+Base.@kwdef struct BlobResourceContents <: ResourceContents
+    uri::String
+    blob::Vector{UInt8}
+    mime_type::Union{String,Nothing} = nothing
+end
+
+"""
+Embedded resource content as defined in schema
+"""
+Base.@kwdef struct EmbeddedResource <: Content
+    type::String = "resource"  # Schema requires this to be const "resource"
+    resource::Union{TextResourceContents, BlobResourceContents}
+    annotations::Dict{String,Any} = Dict{String,Any}()
+end
+
 """
 Request metadata including progress tracking
 """
@@ -67,6 +133,25 @@ Base.@kwdef struct Implementation
 end
 
 """
+Describes an argument that a prompt can accept.
+"""
+Base.@kwdef struct PromptArgument
+    name::String
+    description::String = ""
+    required::Bool = false
+end
+
+"""
+Represents a message returned as part of a prompt
+"""
+Base.@kwdef struct PromptMessage
+    content::Union{TextContent, ImageContent, EmbeddedResource}
+    role::Role
+end
+
+#= Initialize Protocol Messages =#
+
+"""
 Initialize request parameters
 """
 Base.@kwdef struct InitializeParams <: RequestParams
@@ -85,6 +170,8 @@ Base.@kwdef struct InitializeResult <: ResponseResult
     instructions::String = ""
 end
 
+#= Resource-Related Messages =#
+
 """
 List resources request parameters
 """
@@ -101,6 +188,22 @@ Base.@kwdef struct ListResourcesResult <: ResponseResult
 end
 
 """
+Read resource request parameters
+"""
+Base.@kwdef struct ReadResourceParams <: RequestParams
+    uri::String
+end
+
+"""
+Read resource response result
+"""
+Base.@kwdef struct ReadResourceResult <: ResponseResult
+    contents::Vector{Dict{String,Any}}
+end
+
+#= Tool-Related Messages =#
+
+"""
 List tools request parameters
 """
 Base.@kwdef struct ListToolsParams <: RequestParams 
@@ -113,20 +216,6 @@ List tools response result
 Base.@kwdef struct ListToolsResult <: ResponseResult
     tools::Vector{Dict{String,Any}}
     nextCursor::Union{String,Nothing} = nothing
-end
-
-"""
-Read resource request parameters
-"""
-Base.@kwdef struct ReadResourceParams <: RequestParams
-    uri::String
-end
-
-"""
-Read resource response result
-"""
-Base.@kwdef struct ReadResourceResult <: ResponseResult
-    contents::Vector{Dict{String,Any}}
 end
 
 """
@@ -145,14 +234,7 @@ Base.@kwdef struct CallToolResult <: ResponseResult
     is_error::Bool = false
 end
 
-"""
-Progress notification parameters
-"""
-Base.@kwdef struct ProgressParams <: RequestParams
-    progress_token::ProgressToken
-    progress::Float64
-    total::Union{Float64,Nothing} = nothing
-end
+#= Prompt-Related Messages =#
 
 """
 List prompts request parameters
@@ -185,6 +267,17 @@ Base.@kwdef struct GetPromptResult <: ResponseResult
     messages::Vector{PromptMessage}
 end
 
+#= Progress and Error Messages =#
+
+"""
+Progress notification parameters
+"""
+Base.@kwdef struct ProgressParams <: RequestParams
+    progress_token::ProgressToken
+    progress::Float64
+    total::Union{Float64,Nothing} = nothing
+end
+
 """
 Error information for JSON-RPC error responses
 """
@@ -193,6 +286,8 @@ Base.@kwdef struct ErrorInfo
     message::String
     data::Union{Dict{String,Any},Nothing} = nothing
 end
+
+#= JSON-RPC Message Types =#
 
 """
 JSON-RPC request message
@@ -228,7 +323,14 @@ Base.@kwdef struct JSONRPCNotification <: Notification
     params::Union{RequestParams,Dict{String,Any}}
 end
 
+#= Type System Configuration =#
+
 # Add StructTypes support for JSON serialization
+StructTypes.StructType(::Type{TextContent}) = StructTypes.Struct()
+StructTypes.StructType(::Type{ImageContent}) = StructTypes.Struct()
+StructTypes.StructType(::Type{TextResourceContents}) = StructTypes.Struct()
+StructTypes.StructType(::Type{BlobResourceContents}) = StructTypes.Struct()
+StructTypes.StructType(::Type{EmbeddedResource}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ClientCapabilities}) = StructTypes.Struct()
 StructTypes.StructType(::Type{Implementation}) = StructTypes.Struct()
 StructTypes.StructType(::Type{InitializeParams}) = StructTypes.Struct()
@@ -237,6 +339,7 @@ StructTypes.StructType(::Type{ErrorInfo}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ListResourcesParams}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ListPromptsParams}) = StructTypes.Struct()
 StructTypes.StructType(::Type{GetPromptParams}) = StructTypes.Struct()
+StructTypes.StructType(::Type{PromptMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{T}) where {T<:RequestParams} = StructTypes.Struct()
 StructTypes.StructType(::Type{T}) where {T<:ResponseResult} = StructTypes.Struct()
 
@@ -249,8 +352,13 @@ function StructTypes.omitempties(::Type{ListPromptsResult})
     (:nextCursor,)
 end
 
-# Error codes as specified in the JSON-RPC spec
+#= Error Codes =#
+
+"""
+Error codes as specified in JSON-RPC and MCP
+"""
 module ErrorCodes
+    # JSON-RPC standard error codes
     const PARSE_ERROR = -32700
     const INVALID_REQUEST = -32600
     const METHOD_NOT_FOUND = -32601
@@ -261,5 +369,5 @@ module ErrorCodes
     const RESOURCE_NOT_FOUND = -32000
     const TOOL_NOT_FOUND = -32001
     const INVALID_URI = -32002
-    const PROMPT_NOT_FOUND = -32003  # Added for prompts
+    const PROMPT_NOT_FOUND = -32003
 end
