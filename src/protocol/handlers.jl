@@ -94,26 +94,28 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
 end
 
 function process_template(text::String, arguments::Dict{String,String})
-    # Handle optional segments with {?arg? text with {arg}}
-    text = replace(text, r"{[?](\w+)[?]([^}]+)}" => function(m)
+    # First handle optional segments with {?arg? text with {arg}}
+    processed = replace(text, r"{[?](\w+)[?]([^}]+)}" => function(m::RegexMatch)
         arg_name = m.captures[1]
         conditional_text = m.captures[2]
         if haskey(arguments, arg_name)
             # Process any {arg} references within the conditional text
             result = conditional_text
-            result = replace(result, "{$arg_name}" => arguments[arg_name])
+            for (key, value) in arguments
+                result = replace(result, "{$key}" => value)
+            end
             result
         else
             ""
         end
     end)
     
-    # Replace remaining regular arguments
+    # Then replace remaining regular arguments
     for (key, value) in arguments
-        text = replace(text, "{$key}" => value)
+        processed = replace(processed, "{$key}" => value)
     end
     
-    text
+    processed
 end
 
 function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::HandlerResult
