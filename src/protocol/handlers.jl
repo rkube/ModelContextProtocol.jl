@@ -265,11 +265,10 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
     end
 
     try
-        # Call the data provider
         data = resource.data_provider()
         
-        # Create text resource contents
-        contents = [Dict{String,Any}(
+        # Match the tool call pattern
+        content = [Dict{String,Any}(
             "uri" => string(resource.uri),
             "text" => JSON3.write(data),
             "mimeType" => resource.mime_type
@@ -278,9 +277,13 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
         return HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = Dict("contents" => contents)
+                result = Dict(
+                    "content" => content,
+                    "isError" => false
+                )
             )
         )
+
     catch e
         return HandlerResult(
             error = ErrorInfo(
