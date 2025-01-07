@@ -95,10 +95,11 @@ end
 
 function process_template(text::String, arguments::Dict{String,String})
     # First handle optional segments with {?arg? text with {arg}}
-    processed = replace(text, r"{[?](\w+)[?]([^}]+)}" => function (m::RegexMatch)
+    processed = text
+    for m in eachmatch(r"{[?](\w+)[?]([^}]+)}", text)
         arg_name = m.captures[1]
         conditional_text = m.captures[2]
-        if haskey(arguments, arg_name)
+        replacement = if haskey(arguments, arg_name)
             # Process any {arg} references within the conditional text
             result = conditional_text
             for (key, value) in arguments
@@ -108,7 +109,8 @@ function process_template(text::String, arguments::Dict{String,String})
         else
             ""
         end
-    end)
+        processed = replace(processed, m.match => replacement)
+    end
 
     # Then replace remaining regular arguments
     for (key, value) in arguments
@@ -117,6 +119,7 @@ function process_template(text::String, arguments::Dict{String,String})
 
     processed
 end
+
 
 function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::HandlerResult
     try
