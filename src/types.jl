@@ -66,7 +66,20 @@ Base.@kwdef struct MCPPrompt
     name::String
     description::String = ""
     arguments::Vector{PromptArgument} = PromptArgument[]
+    messages::Vector{PromptMessage} = PromptMessage[]
 end
+
+
+
+function MCPPrompt(name::String, description::String, arguments::Vector{PromptArgument}, text::String)
+    MCPPrompt(
+        name = name,
+        description = description,
+        arguments = arguments,
+        text = text
+    )
+end
+
 
 #= Resource Implementation Types =#
 
@@ -81,6 +94,16 @@ Base.@kwdef struct MCPResource <: Resource
     data_provider::Function
     annotations::Dict{String,Any} = Dict{String,Any}()
 end
+
+function MCPResource(; uri::String, 
+    name::String = "", 
+    description::String = "", 
+    mime_type::String = "application/json", 
+    data_provider::Function, 
+    annotations::Dict{String,Any} = Dict{String,Any}())
+    MCPResource(URI(uri), name, description, mime_type, data_provider, annotations)
+end
+
 
 """
 Resource template as defined in schema

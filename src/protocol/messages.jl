@@ -149,6 +149,10 @@ Base.@kwdef struct PromptMessage
     role::Role
 end
 
+function PromptMessage(content::Union{TextContent, ImageContent, EmbeddedResource})
+    PromptMessage(content = content, role = user)
+end
+
 #= Initialize Protocol Messages =#
 
 """

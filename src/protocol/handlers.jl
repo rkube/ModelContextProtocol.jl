@@ -93,9 +93,29 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
     end
 end
 
-"""
-Handles get prompt requests
-"""
+function process_template(text::String, arguments::Dict{String,String})
+    # Handle optional segments with {?arg? text with {arg}}
+    text = replace(text, r"{[?](\w+)[?]([^}]+)}" => function(m)
+        arg_name = m.captures[1]
+        conditional_text = m.captures[2]
+        if haskey(arguments, arg_name)
+            # Process any {arg} references within the conditional text
+            result = conditional_text
+            result = replace(result, "{$arg_name}" => arguments[arg_name])
+            result
+        else
+            ""
+        end
+    end)
+    
+    # Replace remaining regular arguments
+    for (key, value) in arguments
+        text = replace(text, "{$key}" => value)
+    end
+    
+    text
+end
+
 function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::HandlerResult
     try
         # Find the prompt
@@ -104,7 +124,7 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         if isnothing(prompt_idx)
             return HandlerResult(
                 error = ErrorInfo(
-                    code = ErrorCodes.NOT_FOUND,
+                    code = ErrorCodes.PROMPT_NOT_FOUND,
                     message = "Prompt not found: $(params.name)"
                 )
             )
@@ -126,19 +146,25 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
                 )
             end
         end
-        
-        # Generate prompt content using template provider
-        content = prompt.template_provider(params.arguments)
-        
+
+        # Get the arguments (empty dict if none provided)
+        args = params.arguments isa Nothing ? Dict{String,String}() : params.arguments
+
+        # Process messages with our template processor
         result = Dict{String,Any}(
             "description" => prompt.description,
             "messages" => [Dict{String,Any}(
-                "role" => "assistant",
-                "content" => Dict{String,Any}(
-                    "type" => "text",
-                    "text" => content
-                )
-            )]
+                "role" => string(msg.role),
+                "content" => if msg.content isa TextContent
+                    Dict{String,Any}(
+                        "type" => "text",
+                        "text" => process_template(msg.content.text, args)
+                    )
+                else
+                    # Pass through non-text content unchanged
+                    msg.content
+                end
+            ) for msg in prompt.messages]
         )
 
         HandlerResult(
@@ -156,6 +182,7 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         )
     end
 end
+
 
 """
 Handles resource listing requests
