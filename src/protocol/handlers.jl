@@ -31,22 +31,22 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
         ctx.server.config.capabilities,
         ctx.server
     )
-    
+
     # Create initialization result
     result = InitializeResult(
-        serverInfo = Dict(
+        serverInfo=Dict(
             "name" => ctx.server.config.name,
             "version" => ctx.server.config.version
         ),
-        capabilities = current_capabilities,
-        protocolVersion = params.protocolVersion,
-        instructions = ctx.server.config.instructions
+        capabilities=current_capabilities,
+        protocolVersion=params.protocolVersion,
+        instructions=ctx.server.config.instructions
     )
 
     HandlerResult(
-        response = JSONRPCResponse(
-            id = ctx.request_id,
-            result = result
+        response=JSONRPCResponse(
+            id=ctx.request_id,
+            result=result
         )
     )
 end
@@ -78,16 +78,16 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
         end
 
         HandlerResult(
-            response = JSONRPCResponse(
-                id = ctx.request_id,
-                result = result
+            response=JSONRPCResponse(
+                id=ctx.request_id,
+                result=result
             )
         )
     catch e
         HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Failed to list prompts: $e"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Failed to list prompts: $e"
             )
         )
     end
@@ -95,7 +95,7 @@ end
 
 function process_template(text::String, arguments::Dict{String,String})
     # First handle optional segments with {?arg? text with {arg}}
-    processed = replace(text, r"{[?](\w+)[?]([^}]+)}" => function(m::RegexMatch)
+    processed = replace(text, r"{[?](\w+)[?]([^}]+)}" => function (m::RegexMatch)
         arg_name = m.captures[1]
         conditional_text = m.captures[2]
         if haskey(arguments, arg_name)
@@ -109,12 +109,12 @@ function process_template(text::String, arguments::Dict{String,String})
             ""
         end
     end)
-    
+
     # Then replace remaining regular arguments
     for (key, value) in arguments
         processed = replace(processed, "{$key}" => value)
     end
-    
+
     processed
 end
 
@@ -122,28 +122,28 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
     try
         # Find the prompt
         prompt_idx = findfirst(p -> p.name == params.name, ctx.server.prompts)
-        
+
         if isnothing(prompt_idx)
             return HandlerResult(
-                error = ErrorInfo(
-                    code = ErrorCodes.PROMPT_NOT_FOUND,
-                    message = "Prompt not found: $(params.name)"
+                error=ErrorInfo(
+                    code=ErrorCodes.PROMPT_NOT_FOUND,
+                    message="Prompt not found: $(params.name)"
                 )
             )
         end
 
         prompt = ctx.server.prompts[prompt_idx]
-        
+
         # Validate required arguments
         if !isnothing(params.arguments)
-            missing_args = filter(arg -> arg.required && !haskey(params.arguments, arg.name), 
-                               prompt.arguments)
-            
+            missing_args = filter(arg -> arg.required && !haskey(params.arguments, arg.name),
+                prompt.arguments)
+
             if !isempty(missing_args)
                 return HandlerResult(
-                    error = ErrorInfo(
-                        code = ErrorCodes.INVALID_PARAMS,
-                        message = "Missing required arguments: $(join(map(a -> a.name, missing_args), ", "))"
+                    error=ErrorInfo(
+                        code=ErrorCodes.INVALID_PARAMS,
+                        message="Missing required arguments: $(join(map(a -> a.name, missing_args), ", "))"
                     )
                 )
             end
@@ -170,16 +170,16 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         )
 
         HandlerResult(
-            response = JSONRPCResponse(
-                id = ctx.request_id,
-                result = result
+            response=JSONRPCResponse(
+                id=ctx.request_id,
+                result=result
             )
         )
     catch e
         HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Failed to get prompt: $e"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Failed to get prompt: $e"
             )
         )
     end
@@ -193,8 +193,8 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
     try
         resources = map(ctx.server.resources) do resource::MCPResource
             Dict{String,Any}(
-                "uri" => string(resource.uri),  
-                "name" => resource.name,        
+                "uri" => string(resource.uri),
+                "name" => resource.name,
                 "mimeType" => resource.mime_type,
                 "description" => resource.description,
                 "annotations" => Dict{String,Any}(
@@ -215,16 +215,16 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
         end
 
         HandlerResult(
-            response = JSONRPCResponse(
-                id = ctx.request_id,
-                result = result_dict
+            response=JSONRPCResponse(
+                id=ctx.request_id,
+                result=result_dict
             )
         )
     catch e
         HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Failed to list resources: $e"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Failed to list resources: $e"
             )
         )
     end
@@ -239,9 +239,9 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
         URI(params.uri)
     catch e
         return HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INVALID_URI,
-                message = "Invalid URI format: $(params.uri)"
+            error=ErrorInfo(
+                code=ErrorCodes.INVALID_URI,
+                message="Invalid URI format: $(params.uri)"
             )
         )
     end
@@ -254,12 +254,12 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
             break
         end
     end
-    
+
     if isnothing(resource)
         return HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.RESOURCE_NOT_FOUND,
-                message = "Resource not found: $(params.uri)"
+            error=ErrorInfo(
+                code=ErrorCodes.RESOURCE_NOT_FOUND,
+                message="Resource not found: $(params.uri)"
             )
         )
     end
@@ -267,28 +267,25 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
     try
         data = resource.data_provider()
         
-        # Match the tool call pattern
-        content = [Dict{String,Any}(
+        contents = [Dict{String,Any}(
             "uri" => string(resource.uri),
             "text" => JSON3.write(data),
             "mimeType" => resource.mime_type
         )]
 
-        return HandlerResult(
+        # Use the proper ReadResourceResult struct
+        HandlerResult(
             response = JSONRPCResponse(
                 id = ctx.request_id,
-                result = Dict(
-                    "content" => content,
-                    "isError" => false
-                )
+                result = ReadResourceResult(contents = contents)  # Wrap in proper struct
             )
         )
 
     catch e
         return HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Error reading resource: $(e)"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Error reading resource: $(e)"
             )
         )
     end
@@ -300,12 +297,12 @@ Handles tool calls
 function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerResult
     # Find the tool by name
     tool_idx = findfirst(t -> t.name == params.name, ctx.server.tools)
-    
+
     if isnothing(tool_idx)
         return HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.TOOL_NOT_FOUND,
-                message = "Tool not found: $(params.name)"
+            error=ErrorInfo(
+                code=ErrorCodes.TOOL_NOT_FOUND,
+                message="Tool not found: $(params.name)"
             )
         )
     end
@@ -324,9 +321,9 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         )]
 
         HandlerResult(
-            response = JSONRPCResponse(
-                id = ctx.request_id,
-                result = Dict(
+            response=JSONRPCResponse(
+                id=ctx.request_id,
+                result=Dict(
                     "content" => content,
                     "isError" => false
                 )
@@ -334,9 +331,9 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         )
     catch e
         HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Tool execution failed: $(e)"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Tool execution failed: $(e)"
             )
         )
     end
@@ -369,16 +366,16 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
         )
 
         HandlerResult(
-            response = JSONRPCResponse(
-                id = ctx.request_id,
-                result = result
+            response=JSONRPCResponse(
+                id=ctx.request_id,
+                result=result
             )
         )
     catch e
         HandlerResult(
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Failed to list tools: $e"
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Failed to list tools: $e"
             )
         )
     end
@@ -389,7 +386,7 @@ Handle notifications
 """
 function handle_notification(ctx::RequestContext, notification::JSONRPCNotification)::Nothing
     method = notification.method
-    
+
     if method == "notifications/initialized"
         ctx.server.active = true
     elseif method == "notifications/cancelled"
@@ -397,46 +394,46 @@ function handle_notification(ctx::RequestContext, notification::JSONRPCNotificat
     elseif method == "notifications/progress"
         # Handle progress updates
     end
-    
+
     return nothing
 end
 
 function handle_request(server::Server, request::Request)::Response
     ctx = RequestContext(
-        server = server,
-        request_id = request.id,
-        progress_token = request.meta.progress_token
+        server=server,
+        request_id=request.id,
+        progress_token=request.meta.progress_token
     )
 
     try
         # Handle request with already typed parameters
-        result = 
-        if request.method == "initialize"
-            handle_initialize(ctx, request.params::InitializeParams)
-        elseif request.method == "resources/list"
-            handle_list_resources(ctx, request.params::ListResourcesParams)
-        elseif request.method == "resources/read"
-            handle_read_resource(ctx, request.params::ReadResourceParams)
-        elseif request.method == "tools/call"
-            handle_call_tool(ctx, request.params::CallToolParams)
-        elseif request.method == "tools/list"
-            handle_list_tools(ctx, request.params::ListToolsParams)
-        elseif request.method == "prompts/list"
-            handle_list_prompts(ctx, request.params::ListPromptsParams)
-        elseif request.method == "prompts/get"
-            handle_get_prompt(ctx, request.params::GetPromptParams)
-        else
-            HandlerResult(
-                error = ErrorInfo(
-                    code = ErrorCodes.METHOD_NOT_FOUND,
-                    message = "Unknown method: $(request.method)"
+        result =
+            if request.method == "initialize"
+                handle_initialize(ctx, request.params::InitializeParams)
+            elseif request.method == "resources/list"
+                handle_list_resources(ctx, request.params::ListResourcesParams)
+            elseif request.method == "resources/read"
+                handle_read_resource(ctx, request.params::ReadResourceParams)
+            elseif request.method == "tools/call"
+                handle_call_tool(ctx, request.params::CallToolParams)
+            elseif request.method == "tools/list"
+                handle_list_tools(ctx, request.params::ListToolsParams)
+            elseif request.method == "prompts/list"
+                handle_list_prompts(ctx, request.params::ListPromptsParams)
+            elseif request.method == "prompts/get"
+                handle_get_prompt(ctx, request.params::GetPromptParams)
+            else
+                HandlerResult(
+                    error=ErrorInfo(
+                        code=ErrorCodes.METHOD_NOT_FOUND,
+                        message="Unknown method: $(request.method)"
+                    )
                 )
-            )
-        end
+            end
 
         # Return response or error
         if !isnothing(result.error)
-            JSONRPCError(id = ctx.request_id, error = result.error)
+            JSONRPCError(id=ctx.request_id, error=result.error)
         else
             result.response
         end
@@ -444,10 +441,10 @@ function handle_request(server::Server, request::Request)::Response
         logger = MCPLogger(stderr)
         logger.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
         JSONRPCError(
-            id = ctx.request_id,
-            error = ErrorInfo(
-                code = ErrorCodes.INTERNAL_ERROR,
-                message = "Internal error: $(e)" 
+            id=ctx.request_id,
+            error=ErrorInfo(
+                code=ErrorCodes.INTERNAL_ERROR,
+                message="Internal error: $(e)"
             )
         )
     end
