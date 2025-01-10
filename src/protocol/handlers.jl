@@ -94,30 +94,64 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
 end
 
 function process_template(text::String, arguments::Dict{String,String})
-    # First handle optional segments with {?arg? text with {arg}}
-    processed = text
-    for m in eachmatch(r"{[?](\w+)[?]([^}]+)}", text)
-        arg_name = m.captures[1]
-        conditional_text = m.captures[2]
-        replacement = if haskey(arguments, arg_name)
-            # Process any {arg} references within the conditional text
-            result = conditional_text
-            for (key, value) in arguments
-                result = replace(result, "{$key}" => value)
+    # Handle the text character by character to ensure proper brace matching
+    result = text
+    
+    # First, handle conditional blocks
+    while true
+        # Find the start of a conditional block
+        start_idx = findfirst("{?", result)
+        isnothing(start_idx) && break
+        
+        # Find the variable name
+        var_end_idx = findfirst("?", result[start_idx[end]+1:end])
+        isnothing(var_end_idx) && break
+        var_end_idx = var_end_idx[1] + start_idx[end]
+        var_name = result[start_idx[end]+1:var_end_idx-1]
+        
+        # Find the matching closing brace
+        content_start = var_end_idx + 1
+        brace_count = 1
+        content_end = nothing
+        
+        for i in content_start:length(result)
+            if result[i] == '{'
+                brace_count += 1
+            elseif result[i] == '}'
+                brace_count -= 1
+                if brace_count == 0
+                    content_end = i
+                    break
+                end
             end
-            result
-        else
-            ""
         end
-        processed = replace(processed, m.match => replacement)
+        
+        isnothing(content_end) && break
+        
+        # Extract the content
+        content = result[content_start:content_end-1]
+        
+        # Process the conditional block
+        if haskey(arguments, var_name)
+            # Replace variables in the content
+            processed_content = content
+            for (key, value) in arguments
+                processed_content = replace(processed_content, "{$key}" => value)
+            end
+            # Replace the entire conditional block with the processed content
+            result = result[1:start_idx[1]-1] * processed_content * result[content_end+1:end]
+        else
+            # Remove the entire conditional block
+            result = result[1:start_idx[1]-1] * result[content_end+1:end]
+        end
     end
-
-    # Then replace remaining regular arguments
+    
+    # Finally, handle any remaining regular variables
     for (key, value) in arguments
-        processed = replace(processed, "{$key}" => value)
+        result = replace(result, "{$key}" => value)
     end
-
-    processed
+    
+    return result
 end
 
 
