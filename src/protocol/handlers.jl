@@ -189,27 +189,33 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         # Get the arguments (empty dict if none provided)
         args = params.arguments isa Nothing ? Dict{String,String}() : params.arguments
 
-        # Process messages with our template processor
-        result = Dict{String,Any}(
-            "description" => prompt.description,
-            "messages" => [Dict{String,Any}(
-                "role" => string(msg.role),
-                "content" => if msg.content isa TextContent
-                    Dict{String,Any}(
-                        "type" => "text",
-                        "text" => process_template(msg.content.text, args)
+        # Process messages with template processor
+        processed_messages = map(prompt.messages) do msg
+            if msg.content isa TextContent
+                # Create new message with processed text
+                PromptMessage(
+                    role = msg.role,
+                    content = TextContent(
+                        type = "text",
+                        text = process_template(msg.content.text, args)
                     )
-                else
-                    # Pass through non-text content unchanged
-                    msg.content
-                end
-            ) for msg in prompt.messages]
+                )
+            else
+                # Pass through non-text messages unchanged
+                msg
+            end
+        end
+
+        # Create proper GetPromptResult
+        result = GetPromptResult(
+            description = prompt.description,
+            messages = processed_messages
         )
 
         HandlerResult(
-            response=JSONRPCResponse(
-                id=ctx.request_id,
-                result=result
+            response = JSONRPCResponse(
+                id = ctx.request_id,
+                result = result
             )
         )
     catch e
