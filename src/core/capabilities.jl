@@ -1,4 +1,4 @@
-# src/capabilities.jl
+# src/core/capabilities.jl
 
 """
 Capability for resource-related features

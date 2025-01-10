@@ -1,6 +1,7 @@
 using Pkg
 Pkg.activate(@__DIR__)
 
+using Revise
 using ModelContextProtocol
 using Dates
 
@@ -38,7 +39,7 @@ movie_info_prompt = MCPPrompt(
     ],
     messages = [
         PromptMessage(
-            TextContent(
+            content = TextContent(
                 type = "text",
                 text = "What are some notable {genre} movies{?year? from {year}} that influenced the genre? Analyze their impact on filmmaking."
             )
@@ -46,24 +47,14 @@ movie_info_prompt = MCPPrompt(
     ]
 )
 
-# Create and configure server 
-config = ServerConfig(
-    name = "time-weather-server",
-    description = "Time formatting and weather information service",
-    capabilities = [
-        ResourceCapability(list_changed = true),
-        ToolCapability(list_changed = true),
-        PromptCapability(list_changed = true)
-    ]
+# Create and start server with all components
+server = mcp_server(
+    name = "time-movie-server",
+    description = "Time formatting and movie analysis service",
+    tools = time_tool,
+    resources = birthday_resource,
+    prompts = movie_info_prompt
 )
-
-# Create server instance
-server = Server(config)
-
-# Register components
-register!(server, time_tool)
-register!(server, birthday_resource)
-register!(server, movie_info_prompt)
 
 # Start the server
 start!(server)
