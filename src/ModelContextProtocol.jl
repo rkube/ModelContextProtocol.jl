@@ -1,6 +1,6 @@
 module ModelContextProtocol
 
-using JSON3, URIs, DataStructures, Logging, Dates, StructTypes
+using JSON3, URIs, DataStructures, Logging, Dates, StructTypes, MacroTools
 
 # 1. Foundation
 include("core/types.jl")
