@@ -1,45 +1,59 @@
-__precompile__(false)
-
 module ModelContextProtocol
 
-using JSON3
-using URIs
-using DataStructures
-using Logging
-using Dates
-using StructTypes
+using JSON3, URIs, DataStructures, Logging, Dates, StructTypes
 
+# 1. Foundation
+include("core/types.jl")
 
-# First include protocol types as they define fundamental types
+# 2. Features
+include("features/tools.jl")
+include("features/resources.jl") 
+include("features/prompts.jl")
+
+# 3. Protocol Types
 include("protocol/messages.jl")
 
-# Then include core types that might depend on protocol types
-include("types.jl")
+# 4. Server Types
+include("core/server_types.jl")  
 
-# Then include implementations
-include("capabilities.jl")
-include("protocol/jsonrpc.jl")
-include("protocol/handlers.jl")
-include("server.jl")
-
-# Finally include utilities
+# 5. Utils
+include("utils/errors.jl")
 include("utils/logging.jl")
+
+# 6. Implementation
+include("protocol/jsonrpc.jl")
+include("core/capabilities.jl")
+include("core/server.jl")
+include("core/init.jl")
+include("protocol/handlers.jl")
+
+# 7. Serialization (needs all types)
+include("utils/serialization.jl")
 
 # Export all public interfaces
 export 
-    # Main Server Call
-    mcp_server,
 
-    # Core types
+    # Primary interface function 
+    mcp_server,
+    
+    # Core types & enums
+    Role, RequestId, ProgressToken,
+    MCPMessage, Request, Response, Notification,
+    RequestParams, ResponseResult,
+    Content, ResourceContents,
+    TextContent, ImageContent, TextResourceContents, BlobResourceContents,
+    EmbeddedResource,
+
+    # Server types
     Server, ServerConfig,
     Tool, Resource, Capability,
+    
+    # Feature types
     ToolParameter, MCPTool, MCPResource, 
-    Content, TextContent, ImageContent,
+    ResourceTemplate,
     
     # Prompt types
     PromptArgument, MCPPrompt, PromptMessage,
-    ListPromptsParams, GetPromptParams,
-    ListPromptsResult, GetPromptResult,
     
     # Server operations
     start!, stop!, register!,
@@ -50,21 +64,26 @@ export
     # Server management
     subscribe!, unsubscribe!,
     
-    # Protocol types
-    MCPMessage, Request, Response, Notification,
-    RequestParams, ResponseResult, ErrorInfo,
-    RequestId,  # Make sure this is included in exports
+    # Protocol message types
+    RequestMeta, ClientCapabilities, Implementation,
+    InitializeParams, InitializeResult,
+    ListResourcesParams, ListResourcesResult,
+    ReadResourceParams, ReadResourceResult,
+    ListToolsParams, ListToolsResult,
+    CallToolParams, CallToolResult,
+    ListPromptsParams, ListPromptsResult,
+    GetPromptParams, GetPromptResult,
+    ProgressParams, ErrorInfo,
+    JSONRPCRequest, JSONRPCResponse, JSONRPCError, JSONRPCNotification,
     
     # Protocol functions
     parse_message, serialize_message,
     
     # Utils
     MCPLogger, init_logging,
+    ErrorCodes,  # Export error codes module
 
     # Handlers
-    HandlerResult, RequestContext,
-
-    # Export JSONRPCError
-    JSONRPCError
+    HandlerResult, RequestContext
 
 end # module
