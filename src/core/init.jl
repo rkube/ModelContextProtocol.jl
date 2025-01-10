@@ -16,11 +16,40 @@ end
 """
     mcp_server(; name, version="1.0.0", tools=nothing, resources=nothing, prompts=nothing, description="") -> Server
 
-Create and configure an MCP server with the given components.
+Primary entry point for creating and configuring a Model Context Protocol (MCP) server. The server acts as a host for tools, 
+resources, and prompts that can be accessed by MCP-compatible language models like Claude.
+
+# Arguments
+- `name::String`: Unique identifier for the server instance 
+- `version::String="2024-11-05"`: Server implementation version
+- `tools::Union{Vector{MCPTool}, MCPTool, Nothing}=nothing`: Tools to expose to the model
+- `resources::Union{Vector{MCPResource}, MCPResource, Nothing}=nothing`: Resources available to the model
+- `prompts::Union{Vector{MCPPrompt}, MCPPrompt, Nothing}=nothing`: Predefined prompts for the model
+- `description::String=""`: Optional server description
+- `capabilities::Vector{Capability}=default_capabilities()`: Server capability configuration
+
+# Example
+```julia
+server = mcp_server(
+    name = "my-server",
+    description = "Demo server with time tool",
+    tools = MCPTool(
+        name = "get_time",
+        description = "Get current time. Uses MCP server computer clock",
+        parameters = [],
+        handler = args -> Dates.format(now(), args["format"])
+    )
+)
+start!(server)
+```
+
+Returns a configured `Server` instance ready to handle MCP client connections.
+
+See also: [`MCPTool`](@ref), [`MCPResource`](@ref), [`MCPPrompt`](@ref)
 """
 function mcp_server(;
     name::String,
-    version::String = "1.0.0", 
+    version::String = "2024-11-05", 
     tools::Union{Vector{MCPTool}, MCPTool, Nothing} = nothing,
     resources::Union{Vector{MCPResource}, MCPResource, Nothing} = nothing,
     prompts::Union{Vector{MCPPrompt}, MCPPrompt, Nothing} = nothing,  # Added prompts parameter

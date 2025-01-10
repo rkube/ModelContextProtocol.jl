@@ -1,14 +1,21 @@
+# ModelContextProtocol.jl
+
+Documentation for ModelContextProtocol.jl
+
 ```@meta
 CurrentModule = ModelContextProtocol
 ```
 
-# ModelContextProtocol
+## Overview
 
-Documentation for [ModelContextProtocol](https://github.com/JuliaSMLM/ModelContextProtocol.jl).
+ModelContextProtocol.jl is a Julia implementation of the Model Context Protocol (MCP), providing server capabilities for integrating with LLMs such as Anthropic's Claude.
 
-```@index
+## Installation
+
+```julia
+using Pkg
+Pkg.add("ModelContextProtocol")
 ```
 
-```@autodocs
-Modules = [ModelContextProtocol]
-```
+## Quick Start
+
