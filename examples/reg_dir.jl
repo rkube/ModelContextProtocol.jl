@@ -6,8 +6,13 @@ Pkg.activate(@__DIR__)
 using Revise
 using ModelContextProtocol
 
-# Tool dependencies
-using Dates
+# Initialize shared storage in Main
+if !isdefined(Main, :storage)
+    global storage  # Declare `storage` as a global variable
+    Main.storage = Dict{String, Any}()  # Assign it to `Main`
+end
+
+
 
 # Create and start server with all components
 server = mcp_server(

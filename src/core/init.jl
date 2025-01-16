@@ -75,8 +75,6 @@ The directory structure should be:
 Each subdirectory is optional. Files are expected to be .jl files that export
 component definitions.
 """
-# src/core/server.jl
-
 function auto_register!(server::Server, dir::AbstractString)
     component_dirs = [
         ("tools", MCPTool),
