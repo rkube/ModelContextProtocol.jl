@@ -18,7 +18,7 @@ Base.@kwdef struct MCPTool <: Tool
     description::String
     parameters::Vector{ToolParameter}
     handler::Function
-    return_type::Type = Any
+    return_type::Type{<:Content} = TextContent  # Use existing Content types
 end
 
 

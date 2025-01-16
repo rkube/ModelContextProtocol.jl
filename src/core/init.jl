@@ -1,5 +1,24 @@
 # src/core/init.jl
 
+"""
+    normalize_path(path::String) -> String
+
+Normalize a path to absolute form, handling both relative and absolute paths.
+"""
+function normalize_path(path::String)
+    if isnothing(path)
+        return nothing
+    end
+    
+    # Convert to absolute path
+    if !isabspath(path)
+        # Relative paths should be relative to project root
+        path = joinpath(dirname(dirname(@__DIR__)), path)
+    end
+    
+    # Normalize the path (resolve .., ., and symlinks)
+    return abspath(path)
+end
 
 """
 Scan directory for MCP components and return found definitions
@@ -42,25 +61,57 @@ function scan_mcp_components(dir::String)
     return components
 end
 
+# src/core/server.jl
+
 """
-Auto-register components from specified directory
+    auto_register!(server::Server, dir::AbstractString)
+
+Automatically register components found in the specified directory.
+The directory structure should be:
+- dir/tools/        # Contains tool definitions
+- dir/resources/    # Contains resource definitions
+- dir/prompts/      # Contains prompt definitions
+
+Each subdirectory is optional. Files are expected to be .jl files that export
+component definitions.
 """
-function auto_register!(server::Server, dir::String)
-    components = scan_mcp_components(dir)
+function auto_register!(server::Server, dir::AbstractString)
+    component_dirs = [
+        ("tools", MCPTool),
+        ("resources", MCPResource),
+        ("prompts", MCPPrompt)
+    ]
     
-    for tool in components[:tools]
-        register!(server, tool)
-        @info "Registered tool: $(tool.name)"
-    end
-    
-    for resource in components[:resources]
-        register!(server, resource)
-        @info "Registered resource: $(resource.name)"
-    end
-    
-    for prompt in components[:prompts]
-        register!(server, prompt)
-        @info "Registered prompt: $(prompt.name)"
+    for (subdir, type) in component_dirs
+        component_dir = joinpath(dir, subdir)
+        if isdir(component_dir)
+            for file in readdir(component_dir, join=true)
+                if endswith(file, ".jl")
+                    try
+                        # Create a new module with ModelContextProtocol already imported
+                        mod = Module()
+                        Core.eval(mod, :(using ModelContextProtocol))
+                        
+                        # Simply include the file in this module's namespace
+                        Base.include(mod, file)
+                        
+                        # Look for ANY variables that are of our target type
+                        # No need for exports!
+                        for name in names(mod, all=true)
+                            if isdefined(mod, name)
+                                component = getfield(mod, name)
+                                if component isa type
+                                    register!(server, component)
+                                    @info "Registered $type from $file: $name"
+                                end
+                            end
+                        end
+                    catch e
+                        @warn "Error processing $file" exception=e stack=stacktrace(catch_backtrace())
+                    end
+                end
+            end
+        end
     end
     
     return server
@@ -154,7 +205,9 @@ function mcp_server(;
     
     # Auto-register components if directory provided
     if !isnothing(auto_register_dir)
-        auto_register!(server, auto_register_dir)
+        normalized_path = normalize_path(auto_register_dir)
+        @info "Auto-registering components from $normalized_path"
+        auto_register!(server, normalized_path)
     end
     
     return server

@@ -356,19 +356,35 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         # Call the tool handler with the arguments
         result = tool.handler(params.arguments)
 
-        # Create content array with tool result
-        content = [Dict{String,Any}(
-            "type" => "text",
-            "text" => JSON3.write(result),
-            "annotations" => Dict{String,Any}()
-        )]
+        # Validate return type matches what's declared
+        if !(result isa tool.return_type)
+            throw(ArgumentError("Tool returned $(typeof(result)), expected $(tool.return_type)"))
+        end
+
+        # Convert content to protocol format
+        content = if result isa ImageContent
+            [Dict{String,Any}(
+                "type" => "image",
+                "data" => base64encode(result.data),
+                "mimeType" => result.mime_type,
+                "annotations" => result.annotations
+            )]
+        elseif result isa TextContent
+            [Dict{String,Any}(
+                "type" => "text",
+                "text" => result.text,
+                "annotations" => result.annotations
+            )]
+        else
+            throw(ArgumentError("Unsupported content type: $(typeof(result))"))
+        end
 
         HandlerResult(
             response=JSONRPCResponse(
                 id=ctx.request_id,
-                result=Dict(
-                    "content" => content,
-                    "isError" => false
+                result=CallToolResult(
+                    content=content,
+                    is_error=false
                 )
             )
         )
