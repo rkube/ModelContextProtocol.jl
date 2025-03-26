@@ -29,7 +29,13 @@ julia_gen_array = MCPTool(
     handler = params -> begin
         # Parse or convert the size parameter explicitly
         name = params["name"]
-        sz = parse(Int, params["size"])  
+        # handle if size is string
+        if typeof(params["size"]) == String
+            sz = parse(Int, params["size"])
+        else
+            sz = params["size"]
+        end
+        
         result = gen_2d_array(name, sz)
         TextContent(
             type = "text",
