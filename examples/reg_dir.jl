@@ -3,7 +3,6 @@
 using Pkg
 Pkg.activate(@__DIR__)
 
-using Revise
 using ModelContextProtocol
 
 # Initialize shared storage in Main
