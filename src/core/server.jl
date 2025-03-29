@@ -82,7 +82,7 @@ function process_message(server::Server, state::ServerState, message::String)::U
 end
 
 """
-Main server loop - reads from stdin and writes to stdout
+Main server loop - reads from stdin and writes to stdout with optimized CPU usage
 """
 function run_server_loop(server::Server, state::ServerState)
     state.running = true
@@ -91,9 +91,27 @@ function run_server_loop(server::Server, state::ServerState)
     flush(stdout)
     flush(stderr)
     
+    # Pre-allocate common error responses to reduce allocations
+    error_templates = Dict{Int, ErrorInfo}(
+        ErrorCodes.PARSE_ERROR => ErrorInfo(
+            code = ErrorCodes.PARSE_ERROR,
+            message = "Failed to parse message"
+        ),
+        ErrorCodes.INTERNAL_ERROR => ErrorInfo(
+            code = ErrorCodes.INTERNAL_ERROR,
+            message = "Internal server error"
+        )
+    )
+    
     while state.running
         try
+            # readline() is already blocking, so it doesn't consume CPU while waiting
             message = readline()
+            
+            # Skip empty messages to avoid unnecessary processing
+            isempty(message) && continue
+            
+            # Process the message only if non-empty
             @debug "Processing message" raw=message
             response = process_message(server, state, message)
             
@@ -106,18 +124,25 @@ function run_server_loop(server::Server, state::ServerState)
             if e isa InterruptException
                 @info "Server shutting down..."
                 break
+            elseif e isa EOFError
+                @info "Input stream closed, shutting down..."
+                break
             end
             
             @error "Error processing message" exception=e
             
-            # Try to send error response
+            # Try to send error response with pre-allocated template
             try
-                error_response = serialize_message(JSONRPCError(
-                    id = nothing,
-                    error = ErrorInfo(
+                error_info = get(error_templates, ErrorCodes.INTERNAL_ERROR, 
+                    ErrorInfo(
                         code = ErrorCodes.INTERNAL_ERROR,
                         message = "Internal server error: $(e)"
                     )
+                )
+                
+                error_response = serialize_message(JSONRPCError(
+                    id = nothing,
+                    error = error_info
                 ))
                 println(error_response)
                 flush(stdout)

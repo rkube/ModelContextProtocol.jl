@@ -23,6 +23,43 @@ Base.@kwdef struct HandlerResult
 end
 
 """
+Convert various return types to the appropriate Content type
+"""
+function convert_to_content_type(result::Any, return_type::Type)
+    # Dict to TextContent conversion
+    if result isa Dict && return_type == TextContent
+        return TextContent(
+            type = "text",
+            text = JSON3.write(result),
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # String to TextContent conversion
+    if result isa String && return_type == TextContent
+        return TextContent(
+            type = "text",
+            text = result,
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # For ImageContent, if we have the raw data as Vector{UInt8} and a mime_type string
+    if result isa Tuple{Vector{UInt8}, String} && return_type == ImageContent
+        data, mime_type = result
+        return ImageContent(
+            type = "image",
+            data = data,
+            mime_type = mime_type,
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # If no conversion is needed or applicable, return as is
+    return result
+end
+
+"""
 Handle initialization requests with standardized capability broadcasting
 """
 function handle_initialize(ctx::RequestContext, params::InitializeParams)::HandlerResult
@@ -355,6 +392,9 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     try
         # Call the tool handler with the arguments
         result = tool.handler(params.arguments)
+        
+        # Apply automatic conversion to the expected return type
+        result = convert_to_content_type(result, tool.return_type)
 
         # Validate return type matches what's declared
         if !(result isa tool.return_type)

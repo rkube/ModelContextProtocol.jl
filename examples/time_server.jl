@@ -4,7 +4,7 @@ Pkg.activate(@__DIR__)
 using ModelContextProtocol
 using Dates
 
-# Define a tool 
+# Define a tool - can now return Dict directly!
 time_tool = MCPTool(
     name = "current_time",
     description = "Get Current Date and Time",
