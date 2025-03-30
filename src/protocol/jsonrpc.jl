@@ -12,14 +12,32 @@ const REQUEST_PARAMS_MAP = Dict{String,Type}(
 )
 
 """
-Get the parameter type for a given method
+    get_params_type(method::String) -> Union{Type,Nothing}
+
+Get the appropriate parameter type for a given JSON-RPC method name.
+
+# Arguments
+- `method::String`: The JSON-RPC method name
+
+# Returns
+- `Union{Type,Nothing}`: The Julia type to use for parsing parameters, or `nothing` if no specific type is defined
 """
 function get_params_type(method::String)::Union{Type,Nothing}
     get(REQUEST_PARAMS_MAP, method, nothing)
 end
 
 """
-Get the expected result type for a request ID (needs to be implemented based on request tracking)
+    get_result_type(id::RequestId) -> Union{Type{<:ResponseResult},Nothing}
+
+Get the expected result type for a response based on the request ID.
+
+# Arguments
+- `id::RequestId`: The request ID to look up
+
+# Returns
+- `Union{Type{<:ResponseResult},Nothing}`: The expected response result type, or `nothing` if not known
+
+Note: This is a placeholder that needs to be implemented with request tracking.
 """
 function get_result_type(id::RequestId)::Union{Type{<:ResponseResult},Nothing}
     # This would need to track request types to know what response type to expect
@@ -27,7 +45,15 @@ function get_result_type(id::RequestId)::Union{Type{<:ResponseResult},Nothing}
 end
 
 """
-Parse a JSON-RPC message string into appropriate message type
+    parse_message(json::String) -> MCPMessage
+
+Parse a JSON-RPC message string into the appropriate typed message object.
+
+# Arguments
+- `json::String`: The raw JSON-RPC message string
+
+# Returns
+- `MCPMessage`: A typed MCPMessage subtype (JSONRPCRequest, JSONRPCResponse, JSONRPCNotification, or JSONRPCError)
 """
 function parse_message(json::String)::MCPMessage
     raw = try
@@ -87,7 +113,15 @@ function parse_message(json::String)::MCPMessage
 end
 
 """
-Parse a JSON-RPC request
+    parse_request(raw::JSON3.Object) -> Request
+
+Parse a JSON-RPC request object into a typed Request struct.
+
+# Arguments
+- `raw::JSON3.Object`: The parsed JSON object representing a request
+
+# Returns
+- `Request`: A JSONRPCRequest with properly typed parameters based on the method
 """
 function parse_request(raw::JSON3.Object)::Request
     method = raw.method
@@ -111,7 +145,15 @@ function parse_request(raw::JSON3.Object)::Request
 end
 
 """
-Parse a JSON-RPC notification
+    parse_notification(raw::JSON3.Object) -> Notification
+
+Parse a JSON-RPC notification object into a typed Notification struct.
+
+# Arguments
+- `raw::JSON3.Object`: The parsed JSON object representing a notification
+
+# Returns
+- `Notification`: A JSONRPCNotification with properly typed parameters if possible
 """
 function parse_notification(raw::JSON3.Object)::Notification
     method = raw.method
@@ -142,7 +184,15 @@ function parse_notification(raw::JSON3.Object)::Notification
 end
 
 """
-Parse a successful JSON-RPC response
+    parse_success_response(raw::JSON3.Object) -> Response
+
+Parse a successful JSON-RPC response object into a typed Response struct.
+
+# Arguments
+- `raw::JSON3.Object`: The parsed JSON object representing a successful response
+
+# Returns
+- `Response`: A JSONRPCResponse with properly typed result if possible, or JSONRPCError if parsing fails
 """
 function parse_success_response(raw::JSON3.Object)::Response
     result_type = get_result_type(raw.id)
@@ -170,7 +220,15 @@ function parse_success_response(raw::JSON3.Object)::Response
 end
 
 """
-Parse a JSON-RPC error response
+    parse_error_response(raw::JSON3.Object) -> Response
+
+Parse a JSON-RPC error response object into a typed Response struct.
+
+# Arguments
+- `raw::JSON3.Object`: The parsed JSON object representing an error response
+
+# Returns
+- `Response`: A JSONRPCError with properly typed error information
 """
 function parse_error_response(raw::JSON3.Object)::Response
     JSONRPCError(
@@ -180,7 +238,15 @@ function parse_error_response(raw::JSON3.Object)::Response
 end
 
 """
-Serialize an MCP message to JSON string
+    serialize_message(msg::MCPMessage) -> String
+
+Serialize an MCP message object into a JSON-RPC compliant string.
+
+# Arguments
+- `msg::MCPMessage`: The message object to serialize (Request, Response, Notification, or Error)
+
+# Returns
+- `String`: A JSON string representation of the message following the JSON-RPC 2.0 specification
 """
 function serialize_message(msg::MCPMessage)::String
     if msg isa JSONRPCRequest

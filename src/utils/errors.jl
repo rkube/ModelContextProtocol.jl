@@ -1,7 +1,9 @@
 # src/utils/errors.jl
 
 """
-Error codes as specified in JSON-RPC and MCP
+    ErrorCodes
+
+Define standard error codes used in the JSON-RPC and MCP protocols.
 """
 module ErrorCodes
     # JSON-RPC standard error codes

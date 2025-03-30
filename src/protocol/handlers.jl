@@ -1,12 +1,22 @@
 # src/protocol/handlers.jl
 
 """
-Base type for all request handlers
+    RequestHandler
+
+Define base type for all request handlers.
 """
 abstract type RequestHandler end
 
 """
-Stores the current request context
+    RequestContext(; server::Server, request_id::Union{RequestId,Nothing}=nothing, 
+                 progress_token::Union{ProgressToken,Nothing}=nothing)
+
+Store the current request context for MCP protocol handlers.
+
+# Fields
+- `server::Server`: The MCP server instance handling the request
+- `request_id::Union{RequestId,Nothing}`: The ID of the current request (if any)
+- `progress_token::Union{ProgressToken,Nothing}`: Optional token for progress reporting
 """
 Base.@kwdef mutable struct RequestContext
     server::Server
@@ -15,7 +25,16 @@ Base.@kwdef mutable struct RequestContext
 end
 
 """
-Result of handling a request
+    HandlerResult(; response::Union{Response,Nothing}=nothing, 
+                error::Union{ErrorInfo,Nothing}=nothing)
+
+Represent the result of handling a request.
+
+# Fields
+- `response::Union{Response,Nothing}`: The response to send (if successful)
+- `error::Union{ErrorInfo,Nothing}`: Error information (if request failed)
+
+A HandlerResult must contain either a response or an error, but not both.
 """
 Base.@kwdef struct HandlerResult
     response::Union{Response,Nothing} = nothing
@@ -23,7 +42,16 @@ Base.@kwdef struct HandlerResult
 end
 
 """
-Convert various return types to the appropriate Content type
+    convert_to_content_type(result::Any, return_type::Type) -> Content
+
+Convert various return types to the appropriate MCP Content type.
+
+# Arguments
+- `result::Any`: The result value to convert
+- `return_type::Type`: The target Content type to convert to
+
+# Returns
+- `Content`: The converted Content object or the original result if no conversion is applicable
 """
 function convert_to_content_type(result::Any, return_type::Type)
     # Dict to TextContent conversion
@@ -60,7 +88,16 @@ function convert_to_content_type(result::Any, return_type::Type)
 end
 
 """
-Handle initialization requests with standardized capability broadcasting
+    handle_initialize(ctx::RequestContext, params::InitializeParams) -> HandlerResult
+
+Handle MCP protocol initialization requests by setting up the server and returning capabilities.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::InitializeParams`: The initialization parameters from the client
+
+# Returns
+- `HandlerResult`: Contains the server's capabilities and configuration
 """
 function handle_initialize(ctx::RequestContext, params::InitializeParams)::HandlerResult
     # Get full capabilities including available tools and resources
@@ -89,7 +126,16 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
 end
 
 """
-Handles prompt listing requests
+    handle_list_prompts(ctx::RequestContext, params::ListPromptsParams) -> HandlerResult
+
+Handle requests to list available prompts on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListPromptsParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all available prompts
 """
 function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::HandlerResult
     try
@@ -267,7 +313,16 @@ end
 
 
 """
-Handles resource listing requests
+    handle_list_resources(ctx::RequestContext, params::ListResourcesParams) -> HandlerResult
+
+Handle requests to list all available resources on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListResourcesParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all registered resources
 """
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
@@ -311,7 +366,17 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
 end
 
 """
-Handles resource reading requests
+    handle_read_resource(ctx::RequestContext, params::ReadResourceParams) -> HandlerResult
+
+Handle requests to read content from a specific resource by URI.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ReadResourceParams`: Parameters containing the URI of the resource to read
+
+# Returns
+- `HandlerResult`: Contains either the resource contents or an error if the resource 
+  is not found or cannot be read
 """
 function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::HandlerResult
     # Convert the requested URI string to a URI object for comparison
@@ -372,7 +437,17 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
 end
 
 """
-Handles tool calls
+    handle_call_tool(ctx::RequestContext, params::CallToolParams) -> HandlerResult
+
+Handle requests to call a specific tool with the provided parameters.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::CallToolParams`: Parameters containing the tool name and arguments
+
+# Returns
+- `HandlerResult`: Contains either the tool execution results or an error if the tool
+  is not found or execution fails
 """
 function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerResult
     # Find the tool by name
@@ -439,7 +514,16 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
 end
 
 """
-Handles tool listing requests
+    handle_list_tools(ctx::RequestContext, params::ListToolsParams) -> HandlerResult
+
+Handle requests to list all available tools on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListToolsParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all registered tools
 """
 function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::HandlerResult
     try
@@ -481,7 +565,16 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
 end
 
 """
-Handle notifications
+    handle_notification(ctx::RequestContext, notification::JSONRPCNotification) -> Nothing
+
+Process notification messages from clients that don't require responses.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `notification::JSONRPCNotification`: The notification to process
+
+# Returns
+- `Nothing`: Notifications don't generate responses
 """
 function handle_notification(ctx::RequestContext, notification::JSONRPCNotification)::Nothing
     method = notification.method

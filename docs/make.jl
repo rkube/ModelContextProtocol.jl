@@ -6,18 +6,21 @@ DocMeta.setdocmeta!(ModelContextProtocol, :DocTestSetup, :(using ModelContextPro
 
 makedocs(
     modules = [ModelContextProtocol],
-    authors = "Your Name",
-    repo = "https://github.com/yourusername/ModelContextProtocol.jl/blob/{commit}{path}#{line}",
+    authors = "JuliaSMLM Team",
+    repo = "https://github.com/JuliaSMLM/ModelContextProtocol.jl/blob/{commit}{path}#{line}",
     sitename = "ModelContextProtocol.jl",
     format = Documenter.HTML(;
         prettyurls = get(ENV, "CI", "false") == "true",
-        canonical = "https://yourusername.github.io/ModelContextProtocol.jl",
+        canonical = "https://JuliaSMLM.github.io/ModelContextProtocol.jl",
         edit_link = "main",
         assets = String[],
     ),
     pages = [
         "Home" => "index.md",
-        "API Reference" => "api/api_dump.md"
+        "Tools" => "tools.md",
+        "Resources" => "resources.md",
+        "Prompts" => "prompts.md",
+        "API Reference" => "api.md"
     ],
     doctest = true,
     linkcheck = true,
@@ -25,7 +28,7 @@ makedocs(
 )
 
 deploydocs(;
-    repo = "github.com/yourusername/ModelContextProtocol.jl",
+    repo = "github.com/JuliaSMLM/ModelContextProtocol.jl",
     devbranch = "main",
     push_preview = true
 )

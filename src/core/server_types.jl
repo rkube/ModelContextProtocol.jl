@@ -1,5 +1,13 @@
 """
-Server state tracking
+    ServerState()
+
+Track the internal state of an MCP server during operation.
+
+# Fields
+- `initialized::Bool`: Whether the server has been initialized by a client
+- `running::Bool`: Whether the server main loop is active
+- `last_request_id::Int`: Last used request ID for server-initiated requests
+- `pending_requests::Dict{RequestId,String}`: Map of request IDs to method names
 """
 mutable struct ServerState
     initialized::Bool
@@ -11,14 +19,30 @@ mutable struct ServerState
 end
 
 """
-MCP Server errors
+    ServerError(message::String) <: Exception
+
+Exception type for MCP server-specific errors.
+
+# Fields
+- `message::String`: The error message describing what went wrong
 """
 struct ServerError <: Exception
     message::String
 end
 
 """
-Configuration for an MCP server
+    ServerConfig(; name::String, version::String="1.0.0", 
+               description::String="", capabilities::Vector{Capability}=Capability[],
+               instructions::String="")
+
+Define configuration settings for an MCP server instance.
+
+# Fields
+- `name::String`: The server name shown to clients
+- `version::String`: Server version string
+- `description::String`: Human-readable server description
+- `capabilities::Vector{Capability}`: Protocol capabilities supported by the server
+- `instructions::String`: Usage instructions for clients
 """
 Base.@kwdef struct ServerConfig
     name::String
@@ -29,7 +53,22 @@ Base.@kwdef struct ServerConfig
 end
 
 """
-Represents a running MCP server instance
+    Server(config::ServerConfig)
+
+Represent a running MCP server instance that manages resources, tools, and prompts.
+
+# Fields
+- `config::ServerConfig`: Server configuration settings
+- `resources::Vector{Resource}`: Available resources
+- `tools::Vector{Tool}`: Available tools
+- `prompts::Vector{MCPPrompt}`: Available prompts
+- `resource_templates::Vector{ResourceTemplate}`: Available resource templates
+- `subscriptions::DefaultDict{String,Vector{Subscription}}`: Resource subscription registry
+- `progress_trackers::Dict{Union{String,Int},Progress}`: Progress tracking for operations
+- `active::Bool`: Whether the server is currently active
+
+# Constructor
+- `Server(config::ServerConfig)`: Creates a new server with the specified configuration
 """
 mutable struct Server
     config::ServerConfig
