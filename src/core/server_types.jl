@@ -46,7 +46,7 @@ Define configuration settings for an MCP server instance.
 """
 Base.@kwdef struct ServerConfig
     name::String
-    version::String = "1.0.0"
+    version::String = "2024-11-05"
     description::String = ""
     capabilities::Vector{Capability} = Capability[]
     instructions::String = ""
