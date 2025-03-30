@@ -1,12 +1,22 @@
 # src/protocol/handlers.jl
 
 """
-Base type for all request handlers
+    RequestHandler
+
+Define base type for all request handlers.
 """
 abstract type RequestHandler end
 
 """
-Stores the current request context
+    RequestContext(; server::Server, request_id::Union{RequestId,Nothing}=nothing, 
+                 progress_token::Union{ProgressToken,Nothing}=nothing)
+
+Store the current request context for MCP protocol handlers.
+
+# Fields
+- `server::Server`: The MCP server instance handling the request
+- `request_id::Union{RequestId,Nothing}`: The ID of the current request (if any)
+- `progress_token::Union{ProgressToken,Nothing}`: Optional token for progress reporting
 """
 Base.@kwdef mutable struct RequestContext
     server::Server
@@ -15,7 +25,16 @@ Base.@kwdef mutable struct RequestContext
 end
 
 """
-Result of handling a request
+    HandlerResult(; response::Union{Response,Nothing}=nothing, 
+                error::Union{ErrorInfo,Nothing}=nothing)
+
+Represent the result of handling a request.
+
+# Fields
+- `response::Union{Response,Nothing}`: The response to send (if successful)
+- `error::Union{ErrorInfo,Nothing}`: Error information (if request failed)
+
+A HandlerResult must contain either a response or an error, but not both.
 """
 Base.@kwdef struct HandlerResult
     response::Union{Response,Nothing} = nothing
@@ -23,7 +42,62 @@ Base.@kwdef struct HandlerResult
 end
 
 """
-Handle initialization requests with standardized capability broadcasting
+    convert_to_content_type(result::Any, return_type::Type) -> Content
+
+Convert various return types to the appropriate MCP Content type.
+
+# Arguments
+- `result::Any`: The result value to convert
+- `return_type::Type`: The target Content type to convert to
+
+# Returns
+- `Content`: The converted Content object or the original result if no conversion is applicable
+"""
+function convert_to_content_type(result::Any, return_type::Type)
+    # Dict to TextContent conversion
+    if result isa Dict && return_type == TextContent
+        return TextContent(
+            type = "text",
+            text = JSON3.write(result),
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # String to TextContent conversion
+    if result isa String && return_type == TextContent
+        return TextContent(
+            type = "text",
+            text = result,
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # For ImageContent, if we have the raw data as Vector{UInt8} and a mime_type string
+    if result isa Tuple{Vector{UInt8}, String} && return_type == ImageContent
+        data, mime_type = result
+        return ImageContent(
+            type = "image",
+            data = data,
+            mime_type = mime_type,
+            annotations = Dict{String,Any}()
+        )
+    end
+    
+    # If no conversion is needed or applicable, return as is
+    return result
+end
+
+"""
+    handle_initialize(ctx::RequestContext, params::InitializeParams) -> HandlerResult
+
+Handle MCP protocol initialization requests by setting up the server and returning capabilities.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::InitializeParams`: The initialization parameters from the client
+
+# Returns
+- `HandlerResult`: Contains the server's capabilities and configuration
 """
 function handle_initialize(ctx::RequestContext, params::InitializeParams)::HandlerResult
     # Get full capabilities including available tools and resources
@@ -52,7 +126,16 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
 end
 
 """
-Handles prompt listing requests
+    handle_list_prompts(ctx::RequestContext, params::ListPromptsParams) -> HandlerResult
+
+Handle requests to list available prompts on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListPromptsParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all available prompts
 """
 function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::HandlerResult
     try
@@ -230,7 +313,16 @@ end
 
 
 """
-Handles resource listing requests
+    handle_list_resources(ctx::RequestContext, params::ListResourcesParams) -> HandlerResult
+
+Handle requests to list all available resources on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListResourcesParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all registered resources
 """
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
@@ -274,7 +366,17 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
 end
 
 """
-Handles resource reading requests
+    handle_read_resource(ctx::RequestContext, params::ReadResourceParams) -> HandlerResult
+
+Handle requests to read content from a specific resource by URI.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ReadResourceParams`: Parameters containing the URI of the resource to read
+
+# Returns
+- `HandlerResult`: Contains either the resource contents or an error if the resource 
+  is not found or cannot be read
 """
 function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::HandlerResult
     # Convert the requested URI string to a URI object for comparison
@@ -335,7 +437,17 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
 end
 
 """
-Handles tool calls
+    handle_call_tool(ctx::RequestContext, params::CallToolParams) -> HandlerResult
+
+Handle requests to call a specific tool with the provided parameters.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::CallToolParams`: Parameters containing the tool name and arguments
+
+# Returns
+- `HandlerResult`: Contains either the tool execution results or an error if the tool
+  is not found or execution fails
 """
 function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerResult
     # Find the tool by name
@@ -355,6 +467,9 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     try
         # Call the tool handler with the arguments
         result = tool.handler(params.arguments)
+        
+        # Apply automatic conversion to the expected return type
+        result = convert_to_content_type(result, tool.return_type)
 
         # Validate return type matches what's declared
         if !(result isa tool.return_type)
@@ -399,7 +514,16 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
 end
 
 """
-Handles tool listing requests
+    handle_list_tools(ctx::RequestContext, params::ListToolsParams) -> HandlerResult
+
+Handle requests to list all available tools on the MCP server.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::ListToolsParams`: Parameters for the list request (including optional cursor)
+
+# Returns
+- `HandlerResult`: Contains information about all registered tools
 """
 function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::HandlerResult
     try
@@ -441,7 +565,16 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
 end
 
 """
-Handle notifications
+    handle_notification(ctx::RequestContext, notification::JSONRPCNotification) -> Nothing
+
+Process notification messages from clients that don't require responses.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `notification::JSONRPCNotification`: The notification to process
+
+# Returns
+- `Nothing`: Notifications don't generate responses
 """
 function handle_notification(ctx::RequestContext, notification::JSONRPCNotification)::Nothing
     method = notification.method
@@ -457,6 +590,32 @@ function handle_notification(ctx::RequestContext, notification::JSONRPCNotificat
     return nothing
 end
 
+"""
+    handle_request(server::Server, request::Request) -> Response
+
+Process an MCP protocol request and route it to the appropriate handler based on the request method.
+
+# Arguments
+- `server::Server`: The MCP server instance handling the request
+- `request::Request`: The parsed JSON-RPC request to process
+
+# Behavior
+This function creates a request context, then dispatches the request to the appropriate
+handler based on the request method. Supported methods include:
+- `initialize`: Server initialization
+- `resources/list`: List available resources
+- `resources/read`: Read a specific resource
+- `tools/list`: List available tools
+- `tools/call`: Invoke a specific tool
+- `prompts/list`: List available prompts
+- `prompts/get`: Get a specific prompt
+
+If an unknown method is received, a METHOD_NOT_FOUND error is returned.
+Any exceptions thrown during processing are caught and converted to INTERNAL_ERROR responses.
+
+# Returns
+- `Response`: Either a successful response or an error response depending on the handler result
+"""
 function handle_request(server::Server, request::Request)::Response
     ctx = RequestContext(
         server=server,
@@ -498,8 +657,8 @@ function handle_request(server::Server, request::Request)::Response
         end
     catch e
         logger = MCPLogger(stderr)
-        logger.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
-        JSONRPCError(
+        Logging.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
+        return JSONRPCError(
             id=ctx.request_id,
             error=ErrorInfo(
                 code=ErrorCodes.INTERNAL_ERROR,

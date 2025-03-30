@@ -3,7 +3,13 @@
 """
     normalize_path(path::String) -> String
 
-Normalize a path to absolute form, handling both relative and absolute paths.
+Convert paths to absolute form, resolving relative paths against the project root.
+
+# Arguments
+- `path::String`: The path to normalize
+
+# Returns
+- `String`: Absolute, normalized path with all symbolic links resolved
 """
 function normalize_path(path::String)
     if isnothing(path)
@@ -21,7 +27,15 @@ function normalize_path(path::String)
 end
 
 """
-Scan directory for MCP components and return found definitions
+    scan_mcp_components(dir::String) -> Dict{Symbol,Vector}
+
+Scan a directory recursively for MCP component definitions (tools, resources, prompts).
+
+# Arguments
+- `dir::String`: Directory path to scan for component definitions
+
+# Returns
+- `Dict{Symbol,Vector}`: Dictionary of found components grouped by type
 """
 function scan_mcp_components(dir::String)
     components = Dict(
@@ -64,16 +78,24 @@ end
 # src/core/server.jl
 
 """
-    auto_register!(server::Server, dir::AbstractString)
+    auto_register!(server::Server, dir::AbstractString) -> Server
 
-Automatically register components found in the specified directory.
-The directory structure should be:
-- dir/tools/        # Contains tool definitions
-- dir/resources/    # Contains resource definitions
-- dir/prompts/      # Contains prompt definitions
+Automatically register MCP components found in the specified directory structure.
 
-Each subdirectory is optional. Files are expected to be .jl files that export
-component definitions.
+# Arguments
+- `server::Server`: The server to register components with
+- `dir::AbstractString`: Root directory containing component subdirectories
+
+
+# Directory Structure
+- `dir/tools/`: Contains tool definition files
+- `dir/resources/`: Contains resource definition files
+- `dir/prompts/`: Contains prompt definition files
+
+Each subdirectory is optional. Files should be .jl files containing component definitions.
+
+# Returns
+- `Server`: The updated server instance for method chaining
 """
 function auto_register!(server::Server, dir::AbstractString)
     component_dirs = [
@@ -121,7 +143,10 @@ end
 """
     default_capabilities() -> Vector{Capability}
 
-Return the default set of server capabilities.
+Create the default set of server capabilities for an MCP server.
+
+# Returns
+- `Vector{Capability}`: Default capabilities including resources, tools, and prompts
 """
 function default_capabilities()
     [
@@ -132,20 +157,28 @@ function default_capabilities()
 end
 
 """
-    mcp_server(; name, version="1.0.0", tools=nothing, resources=nothing, prompts=nothing, description="", auto_register_dir=nothing) -> Server
+    mcp_server(; name::String, version::String="2024-11-05", 
+             tools::Union{Vector{MCPTool},MCPTool,Nothing}=nothing,
+             resources::Union{Vector{MCPResource},MCPResource,Nothing}=nothing, 
+             prompts::Union{Vector{MCPPrompt},MCPPrompt,Nothing}=nothing,
+             description::String="", 
+             capabilities::Vector{Capability}=default_capabilities(),
+             auto_register_dir::Union{String,Nothing}=nothing) -> Server
 
-Primary entry point for creating and configuring a Model Context Protocol (MCP) server. The server acts as a host for tools, 
-resources, and prompts that can be accessed by MCP-compatible language models like Claude.
+Primary entry point for creating and configuring a Model Context Protocol (MCP) server.
 
 # Arguments
 - `name::String`: Unique identifier for the server instance 
-- `version::String="2024-11-05"`: Server implementation version
-- `tools::Union{Vector{MCPTool}, MCPTool, Nothing}=nothing`: Tools to expose to the model
-- `resources::Union{Vector{MCPResource}, MCPResource, Nothing}=nothing`: Resources available to the model
-- `prompts::Union{Vector{MCPPrompt}, MCPPrompt, Nothing}=nothing`: Predefined prompts for the model
-- `description::String=""`: Optional server description
-- `capabilities::Vector{Capability}=default_capabilities()`: Server capability configuration
-- `auto_register_dir::Union{String, Nothing}=nothing`: Directory to auto-register components from
+- `version::String`: Server implementation version
+- `tools`: Tools to expose to the model
+- `resources`: Resources available to the model
+- `prompts`: Predefined prompts for the model
+- `description::String`: Optional server description
+- `capabilities::Vector{Capability}`: Server capability configuration
+- `auto_register_dir`: Directory to auto-register components from
+
+# Returns
+- `Server`: A configured server instance ready to handle MCP client connections
 
 # Example
 ```julia
@@ -154,18 +187,13 @@ server = mcp_server(
     description = "Demo server with time tool",
     tools = MCPTool(
         name = "get_time",
-        description = "Get current time. Uses MCP server computer clock",
+        description = "Get current time",
         parameters = [],
-        handler = args -> Dates.format(now(), args["format"])
-    ),
-    auto_register_dir = "path/to/components"
+        handler = args -> Dates.format(now(), "HH:MM:SS")
+    )
 )
 start!(server)
 ```
-
-Returns a configured `Server` instance ready to handle MCP client connections.
-
-See also: [`MCPTool`](@ref), [`MCPResource`](@ref), [`MCPPrompt`](@ref)
 """
 function mcp_server(;
     name::String,

@@ -2,9 +2,16 @@
 
 
 """
-    register!(server::Server, component::Union{Tool,Resource,MCPPrompt})
+    register!(server::Server, component::Union{Tool,Resource,MCPPrompt}) -> Server
 
-Register a tool, resource, or prompt with the server.
+Register a tool, resource, or prompt with the MCP server.
+
+# Arguments
+- `server::Server`: The server to register the component with
+- `component`: The component to register (can be a tool, resource, or prompt)
+
+# Returns
+- `Server`: The server instance for method chaining
 """
 function register! end
 
@@ -24,7 +31,17 @@ function register!(server::Server, prompt::MCPPrompt)
 end
 
 """
-Process an incoming message and generate appropriate response
+    process_message(server::Server, state::ServerState, message::String) -> Union{String,Nothing}
+
+Process an incoming JSON-RPC message and generate an appropriate response.
+
+# Arguments
+- `server::Server`: The MCP server instance
+- `state::ServerState`: Current server state
+- `message::String`: Raw JSON-RPC message to process
+
+# Returns
+- `Union{String,Nothing}`: A serialized response string or nothing for notifications
 """
 function process_message(server::Server, state::ServerState, message::String)::Union{String,Nothing}
     # Parse the incoming message
@@ -82,7 +99,17 @@ function process_message(server::Server, state::ServerState, message::String)::U
 end
 
 """
-Main server loop - reads from stdin and writes to stdout
+    run_server_loop(server::Server, state::ServerState) -> Nothing
+
+Execute the main server loop that reads JSON-RPC messages from stdin and writes responses to stdout.
+Implements optimized CPU usage by blocking on input rather than active polling.
+
+# Arguments
+- `server::Server`: The MCP server instance
+- `state::ServerState`: The server state object to track running status
+
+# Returns
+- `Nothing`: The function runs until interrupted or state.running becomes false
 """
 function run_server_loop(server::Server, state::ServerState)
     state.running = true
@@ -91,9 +118,27 @@ function run_server_loop(server::Server, state::ServerState)
     flush(stdout)
     flush(stderr)
     
+    # Pre-allocate common error responses to reduce allocations
+    error_templates = Dict{Int, ErrorInfo}(
+        ErrorCodes.PARSE_ERROR => ErrorInfo(
+            code = ErrorCodes.PARSE_ERROR,
+            message = "Failed to parse message"
+        ),
+        ErrorCodes.INTERNAL_ERROR => ErrorInfo(
+            code = ErrorCodes.INTERNAL_ERROR,
+            message = "Internal server error"
+        )
+    )
+    
     while state.running
         try
+            # readline() is already blocking, so it doesn't consume CPU while waiting
             message = readline()
+            
+            # Skip empty messages to avoid unnecessary processing
+            isempty(message) && continue
+            
+            # Process the message only if non-empty
             @debug "Processing message" raw=message
             response = process_message(server, state, message)
             
@@ -106,18 +151,25 @@ function run_server_loop(server::Server, state::ServerState)
             if e isa InterruptException
                 @info "Server shutting down..."
                 break
+            elseif e isa EOFError
+                @info "Input stream closed, shutting down..."
+                break
             end
             
             @error "Error processing message" exception=e
             
-            # Try to send error response
+            # Try to send error response with pre-allocated template
             try
-                error_response = serialize_message(JSONRPCError(
-                    id = nothing,
-                    error = ErrorInfo(
+                error_info = get(error_templates, ErrorCodes.INTERNAL_ERROR, 
+                    ErrorInfo(
                         code = ErrorCodes.INTERNAL_ERROR,
                         message = "Internal server error: $(e)"
                     )
+                )
+                
+                error_response = serialize_message(JSONRPCError(
+                    id = nothing,
+                    error = error_info
                 ))
                 println(error_response)
                 flush(stdout)
@@ -129,7 +181,18 @@ function run_server_loop(server::Server, state::ServerState)
 end
 
 """
-Start the server
+    start!(server::Server) -> Nothing
+
+Start the MCP server, setting up logging and entering the main server loop.
+
+# Arguments
+- `server::Server`: The server instance to start
+
+# Returns
+- `Nothing`: The function returns after the server stops
+
+# Throws
+- `ServerError`: If the server is already running
 """
 function start!(server::Server)::Nothing
     if server.active
@@ -161,7 +224,18 @@ function start!(server::Server)::Nothing
 end
 
 """
-Stop the server
+    stop!(server::Server) -> Nothing
+
+Stop a running MCP server.
+
+# Arguments
+- `server::Server`: The server instance to stop
+
+# Returns
+- `Nothing`: The function returns after setting the server to inactive
+
+# Throws
+- `ServerError`: If the server is not currently running
 """
 function stop!(server::Server)
     if !server.active
@@ -173,7 +247,17 @@ function stop!(server::Server)
 end
 
 """
-Subscribe to updates for a specific resource URI
+    subscribe!(server::Server, uri::String, callback::Function) -> Server
+
+Subscribe to updates for a specific resource identified by URI.
+
+# Arguments
+- `server::Server`: The server instance
+- `uri::String`: The resource URI to subscribe to
+- `callback::Function`: The function to call when the resource is updated
+
+# Returns
+- `Server`: The server instance for method chaining
 """
 function subscribe!(server::Server, uri::String, callback::Function)
     subscription = Subscription(uri, callback, now())
@@ -182,7 +266,17 @@ function subscribe!(server::Server, uri::String, callback::Function)
 end
 
 """
-Remove a subscription for a specific resource URI and callback
+    unsubscribe!(server::Server, uri::String, callback::Function) -> Server
+
+Remove a subscription for a specific resource URI and callback function.
+
+# Arguments
+- `server::Server`: The server instance
+- `uri::String`: The resource URI to unsubscribe from
+- `callback::Function`: The callback function to remove
+
+# Returns
+- `Server`: The server instance for method chaining
 """
 function unsubscribe!(server::Server, uri::String, callback::Function)
     filter!(s -> s.callback !== callback, server.subscriptions[uri])

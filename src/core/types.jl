@@ -3,77 +3,127 @@
 # 1. Core enums/aliases
 
 """
-Represents a role in the MCP protocol (user or assistant)
+    Role
+
+Enum representing roles in the MCP protocol.
+
+# Values
+- `user`: Content or messages from the user
+- `assistant`: Content or messages from the assistant
 """
 @enum Role user assistant
 
 """
-JSON-RPC request ID - can be string or integer
+    RequestId
+
+Type alias for JSON-RPC request identifiers.
+
+# Type
+Union{String,Int} - Can be either a string or integer identifier
 """
 const RequestId = Union{String,Int}
 
 """
-Progress token for tracking long-running operations
+    ProgressToken
+
+Type alias for tokens used to track long-running operations.
+
+# Type
+Union{String,Int} - Can be either a string or integer identifier
 """
 const ProgressToken = Union{String,Int}
 
 # 2. Core abstract types
 
 """
-Base type for all MCP protocol messages
+    MCPMessage
+
+Abstract base type for all message types in the MCP protocol.
+Serves as the root type for requests, responses, and notifications.
 """
 abstract type MCPMessage end
 
 """
-Base type for all MCP protocol requests
+    Request <: MCPMessage
+
+Abstract base type for client-to-server requests in the MCP protocol.
+Request messages expect a corresponding response from the server.
 """
 abstract type Request <: MCPMessage end
 
 """
-Base type for all MCP protocol responses
+    Response <: MCPMessage
+
+Abstract base type for server-to-client responses in the MCP protocol.
+Response messages are sent from the server in reply to client requests.
 """
 abstract type Response <: MCPMessage end
 
 """
-Base type for all MCP protocol notifications
+    Notification <: MCPMessage
+
+Abstract base type for one-way notifications in the MCP protocol.
+Notification messages don't expect a corresponding response.
 """
 abstract type Notification <: MCPMessage end
 
 """
-Base type for all request parameters
+    RequestParams
+
+Abstract base type for all parameter structures in MCP protocol requests.
+Concrete subtypes define parameters for specific request methods.
 """
 abstract type RequestParams end
 
 """
-Base type for all response results
+    ResponseResult
+
+Abstract base type for all result structures in MCP protocol responses.
+Concrete subtypes define result formats for specific response methods.
 """
 abstract type ResponseResult end
 
 """
-Base type for content that can be sent or received
+    Content
+
+Abstract base type for all content formats in the MCP protocol.
+Content can be exchanged between clients and servers in various formats.
 """
 abstract type Content end
 
 """
-Base type for all MCP protocol capabilities.
-Implementations should include configuration for specific protocol features.
+    Capability
+
+Abstract base type for all MCP protocol capabilities.
+Capabilities represent protocol features that servers can support.
+Concrete implementations define configuration for specific feature sets.
 """
 abstract type Capability end
 
 """
-Base type for all MCP tools.
+    Tool
+
+Abstract base type for all MCP tools.
 Tools represent operations that can be invoked by clients.
+Concrete implementations define specific tool functionality and parameters.
 """
 abstract type Tool end
 
 """
-Base type for all MCP resources.
-Resources represent data that can be read by clients.
+    Resource
+
+Abstract base type for all MCP resources.
+Resources represent data that can be read and accessed by clients.
+Concrete implementations define specific resource types and access methods.
 """
 abstract type Resource end
 
 """
-Base type for resource contents
+    ResourceContents
+
+Abstract base type for contents of MCP resources.
+ResourceContents represent the actual data stored in resources.
+Concrete implementations define specific content formats (text, binary, etc.).
 """
 abstract type ResourceContents end
 
@@ -81,7 +131,14 @@ abstract type ResourceContents end
 # 3. Core concrete types
 
 """
-Text content with required type field and optional annotations
+    TextContent(; text::String, annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+
+Text-based content for MCP protocol messages.
+
+# Fields
+- `type::String`: Content type identifier (always "text")
+- `text::String`: The actual text content
+- `annotations::Dict{String,Any}`: Optional metadata about the content
 """
 Base.@kwdef struct TextContent <: Content
     type::String = "text"  # Schema requires this to be const "text"
@@ -90,7 +147,15 @@ Base.@kwdef struct TextContent <: Content
 end
 
 """
-Image content with required type and MIME type fields
+    ImageContent(; data::Vector{UInt8}, mime_type::String, annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+
+Image-based content for MCP protocol messages.
+
+# Fields
+- `type::String`: Content type identifier (always "image")
+- `data::Vector{UInt8}`: The binary image data
+- `mime_type::String`: MIME type of the image (e.g., "image/png")
+- `annotations::Dict{String,Any}`: Optional metadata about the content
 """
 Base.@kwdef struct ImageContent <: Content
     type::String = "image"  # Schema requires this to be const "image"
@@ -100,7 +165,14 @@ Base.@kwdef struct ImageContent <: Content
 end
 
 """
-Text-based resource contents
+    TextResourceContents(; uri::String, text::String, mime_type::Union{String,Nothing}=nothing) <: ResourceContents
+
+Text-based contents for MCP resources.
+
+# Fields
+- `uri::String`: Unique identifier for the resource
+- `text::String`: The text content of the resource
+- `mime_type::Union{String,Nothing}`: Optional MIME type of the content
 """
 Base.@kwdef struct TextResourceContents <: ResourceContents
     uri::String
@@ -109,7 +181,14 @@ Base.@kwdef struct TextResourceContents <: ResourceContents
 end
 
 """
-Binary resource contents
+    BlobResourceContents(; uri::String, blob::Vector{UInt8}, mime_type::Union{String,Nothing}=nothing) <: ResourceContents
+
+Binary contents for MCP resources.
+
+# Fields
+- `uri::String`: Unique identifier for the resource
+- `blob::Vector{UInt8}`: The binary content of the resource
+- `mime_type::Union{String,Nothing}`: Optional MIME type of the content
 """
 Base.@kwdef struct BlobResourceContents <: ResourceContents
     uri::String
@@ -118,7 +197,15 @@ Base.@kwdef struct BlobResourceContents <: ResourceContents
 end
 
 """
-Embedded resource content as defined in schema
+    EmbeddedResource(; resource::Union{TextResourceContents, BlobResourceContents}, 
+                    annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+
+Embedded resource content as defined in MCP schema.
+
+# Fields
+- `type::String`: Content type identifier (always "resource")
+- `resource::Union{TextResourceContents, BlobResourceContents}`: The embedded resource content
+- `annotations::Dict{String,Any}`: Optional metadata about the resource
 """
 Base.@kwdef struct EmbeddedResource <: Content
     type::String = "resource"  # Schema requires this to be const "resource"
@@ -127,7 +214,16 @@ Base.@kwdef struct EmbeddedResource <: Content
 end
 
 """
-Progress tracking for long-running operations
+    Progress(; token::Union{String,Int}, current::Float64, 
+            total::Union{Float64,Nothing}=nothing, message::Union{String,Nothing}=nothing)
+
+Tracks progress of long-running operations in the MCP protocol.
+
+# Fields
+- `token::Union{String,Int}`: Unique identifier for the progress tracker
+- `current::Float64`: Current progress value
+- `total::Union{Float64,Nothing}`: Optional total expected value
+- `message::Union{String,Nothing}`: Optional status message
 """
 Base.@kwdef struct Progress
     token::Union{String,Int}
@@ -137,7 +233,14 @@ Base.@kwdef struct Progress
 end
 
 """
-Represents subscriptions to resource updates
+    Subscription(; uri::String, callback::Function, created_at::DateTime=now())
+
+Represents subscriptions to resource updates in the MCP protocol.
+
+# Fields
+- `uri::String`: The URI of the subscribed resource
+- `callback::Function`: Function to call when the resource is updated
+- `created_at::DateTime`: When the subscription was created
 """
 Base.@kwdef struct Subscription
     uri::String

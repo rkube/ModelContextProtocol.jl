@@ -1,15 +1,15 @@
-# ModelContextProtocol
+# ModelContextProtocol.jl
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaSMLM.github.io/ModelContextProtocol.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaSMLM.github.io/ModelContextProtocol.jl/dev/)
 [![Build Status](https://github.com/JuliaSMLM/ModelContextProtocol.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaSMLM/ModelContextProtocol.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/JuliaSMLM/ModelContextProtocol.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaSMLM/ModelContextProtocol.jl)
 
-A Julia implementation of the Model Context Protocol (MCP), enabling integration with Large Language Models (LLMs) like Anthropic's Claude by providing standardized access to tools, resources, and prompts.
+A Julia implementation of the [Model Context Protocol](https://github.com/modelcontextprotocol) (MCP), enabling integration with Large Language Models (LLMs) like Anthropic's Claude by providing standardized access to tools, resources, and prompts.
 
 ## Overview
 
-The [Model Context Protocol](https://github.com/modelcontextprotocol) allows applications to provide context and capabilities to LLMs in a standardized way. This package implements the full MCP specification in Julia, with `mcp_server()` as the main entry point for creating and configuring servers.
+The Model Context Protocol allows applications to provide context and capabilities to LLMs in a standardized way. This package implements the full MCP specification in Julia, with `mcp_server()` as the main entry point for creating and configuring servers.
 
 The `mcp_server()` function provides a flexible interface to:
 - Create MCP servers with custom names and configurations
@@ -24,7 +24,7 @@ server = mcp_server(
     version = "2024-11-05",
     tools = my_tool,              # Single tool or vector of tools
     resources = my_resource,      # Single resource or vector of resources
-    prompts = my_prompt,         # Single prompt or vector of prompts
+    prompts = my_prompt,          # Single prompt or vector of prompts
     description = "Server description",
     auto_register_dir = "path/to/components"  # Optional auto-registration
 )
@@ -51,7 +51,6 @@ The package provides three main types that can be registered with an MCP server:
 3. `MCPPrompt`: Represents template-based prompts
    - Has a name, description, and parameterized message templates
    - Helps standardize interactions with LLMs
-
 
 ## Quick Start
 
@@ -84,7 +83,6 @@ time_tool = MCPTool(
         )
     ],
     handler = params -> TextContent(
-        type = "text",
         text = JSON3.write(Dict(
             "time" => Dates.format(now(), params["format"])
         ))
@@ -101,6 +99,8 @@ server = mcp_server(
 # Start the server
 start!(server)
 ```
+
+When Claude connects to this server, it will discover the `get_time` tool and be able to use it to provide formatted time information to users.
 
 ### Directory-Based Organization
 
@@ -137,76 +137,40 @@ The package will automatically scan the directory structure and register all com
 
 Each component file should export one or more instances of the appropriate type. They will be automatically discovered and registered with the server.
 
-## Component Structure
-
-### Tools
-
-Tools are functions that LLMs can call. Each tool must define:
-- Name and description
-- Input parameters with types and descriptions
-- Handler function that processes the inputs
-
-Example tool file (`tools/calculator.jl`):
-
-```julia
-using ModelContextProtocol
-using JSON3
-
-calculator_tool = MCPTool(
-    name = "calculate",
-    description = "Perform basic arithmetic",
-    parameters = [
-        ToolParameter(
-            name = "expression",
-            type = "string",
-            description = "Math expression to evaluate",
-            required = true
-        )
-    ],
-    handler = params -> TextContent(
-        type = "text",
-        text = JSON3.write(Dict(
-            "result" => eval(Meta.parse(params["expression"]))
-        ))
-    )
-)
-```
-
 ## Using with Claude
 
 To use your MCP server with Claude, you need to:
 
 1. Configure Claude Desktop:
-   Add to `claude_desktop_config.json`:
+   - Go to File → Settings → Developer
+   - Click the Edit Config button
+   - Add to the configuration:
    ```json
    {
      "mcpServers": {
        "my-server": {
          "command": "julia",
-         "args": ["--project=/path/to/project", "server_script.jl"],
-         "env": {
-           "JULIA_DEPOT_PATH": "/path/to/julia/depot"
-         }
+         "args": ["--project=/path/to/project", "server_script.jl"]
        }
      }
    }
    ```
 
-2. Start a conversation with Claude and tell it to use your server:
+2. Restart the Claude Desktop application to apply changes
+
+3. Start a conversation with Claude and tell it to use your server:
    ```
    Please connect to the MCP server named "my-server" and list its available tools.
    ```
 
-3. Claude will connect to your server and can then:
+4. Claude will connect to your server and can then:
    - List available tools using the server's capabilities
    - Call tools with appropriate parameters
    - Access resources and prompts
    - Report results back to you
 
-
-
+See our [documentation](https://JuliaSMLM.github.io/ModelContextProtocol.jl/stable/) for more details on integration with Claude.
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
