@@ -131,7 +131,7 @@ function parse_request(raw::JSON3.Object)::Request
         if isempty(raw.params)
             params_type()  # Construct default instance instead of nothing
         else
-            JSON3.read(JSON3.write(raw.params), params_type)
+            StructTypes.constructfrom(params_type, raw.params)
         end
     else
         nothing
