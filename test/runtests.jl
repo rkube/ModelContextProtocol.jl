@@ -1,6 +1,6 @@
 using Test
 using ModelContextProtocol
-using ModelContextProtocol: handle_initialize, handle_read_resource, handle_list_resources, handle_get_prompt
+using ModelContextProtocol: handle_initialize, handle_read_resource, handle_list_resources, handle_get_prompt, handle_ping
 using JSON3, URIs, DataStructures
 using Logging
 
@@ -113,6 +113,14 @@ const TEST_TOOL = MCPTool(
         result = handle_list_resources(ctx, list_params)
         @test result isa HandlerResult
         @test !isnothing(result.response)
+
+        # Ping requests
+        ctx = RequestContext(server=server, request_id=2)
+        result = handle_ping(ctx, nothing)
+        @test result isa HandlerResult
+        @test !isnothing(result.response)
+        @test result.response.id == 2
+        @test isempty(result.response.result)
     end
 
     @testset "Template Processing" begin
