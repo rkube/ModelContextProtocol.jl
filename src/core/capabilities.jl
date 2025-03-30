@@ -1,5 +1,3 @@
-# src/core/capabilities.jl
-
 """
     ResourceCapability(; list_changed::Bool=false, subscribe::Bool=false)
 
@@ -119,7 +117,66 @@ Convert server capabilities to the initialization response format required by th
 - `Dict{String,Any}`: Protocol-formatted capabilities dictionary including available tools and resources.
 """
 function capabilities_to_protocol(capabilities::Vector{Capability}, server::Server)::Dict{String,Any}
-    # Implementation remains the same
+    result = Dict{String,Any}()
+    
+    # First add base capability flags
+    for cap in capabilities
+        if cap isa ResourceCapability
+            result["resources"] = Dict{String,Any}(
+                "listChanged" => cap.list_changed,
+                "subscribe" => cap.subscribe
+            )
+        elseif cap isa ToolCapability
+            result["tools"] = Dict{String,Any}(
+                "listChanged" => cap.list_changed
+            )
+        elseif cap isa PromptCapability
+            result["prompts"] = Dict{String,Any}(
+                "listChanged" => cap.list_changed
+            )
+        elseif cap isa LoggingCapability
+            result["logging"] = Dict{String,Any}()
+        end
+    end
+    
+    # Then add available tools under their names
+    if haskey(result, "tools") && !isempty(server.tools)
+        tools_dict = result["tools"]  # Get existing dict with listChanged
+        result["tools"] = Dict{String,Any}(
+            "listChanged" => tools_dict["listChanged"]  # Put listChanged first
+        )
+        # Then add tools
+        for tool in server.tools
+            result["tools"][tool.name] = Dict{String,Any}(
+                "name" => tool.name,
+                "description" => tool.description,
+                "inputSchema" => Dict{String,Any}(
+                    "type" => "object",
+                    "properties" => Dict(
+                        param.name => Dict{String,Any}(
+                            "type" => param.type,
+                            "description" => param.description
+                        ) for param in tool.parameters
+                    ),
+                    "required" => [p.name for p in tool.parameters if p.required]
+                )
+            )
+        end
+    end
+
+    # Add available resources array
+    if haskey(result, "resources") && !isempty(server.resources)
+        result["resources"]["resources"] = map(server.resources) do resource
+            Dict{String,Any}(
+                "uri" => string(resource.uri),
+                "name" => resource.name,
+                "mimeType" => resource.mime_type,
+                "description" => resource.description
+            )
+        end
+    end
+    
+    result
 end
 
 """
@@ -135,7 +192,19 @@ Merge two sets of capabilities, with the override set taking precedence.
 - `Vector{Capability}`: Merged set of capabilities.
 """
 function merge_capabilities(base::Vector{Capability}, override::Vector{Capability})::Vector{Capability}
-    # Implementation remains the same
+    result = copy(base)
+    
+    for cap in override
+        # Find matching capability type
+        idx = findfirst(x -> typeof(x) == typeof(cap), result)
+        if isnothing(idx)
+            push!(result, cap)
+        else
+            result[idx] = cap
+        end
+    end
+    
+    result
 end
 
 """
@@ -151,5 +220,13 @@ Create the initialization response for an MCP server.
 - `InitializeResult`: Initialization response including server capabilities and info.
 """
 function create_init_response(server::Server, protocol_version::String)::InitializeResult
-    # Implementation remains the same
+    InitializeResult(
+        serverInfo = Dict(
+            "name" => server.config.name,
+            "version" => server.config.version
+        ),
+        capabilities = capabilities_to_protocol(server.config.capabilities, server),
+        protocolVersion = protocol_version,
+        instructions = server.config.instructions
+    )
 end

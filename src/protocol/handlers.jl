@@ -590,6 +590,32 @@ function handle_notification(ctx::RequestContext, notification::JSONRPCNotificat
     return nothing
 end
 
+"""
+    handle_request(server::Server, request::Request) -> Response
+
+Process an MCP protocol request and route it to the appropriate handler based on the request method.
+
+# Arguments
+- `server::Server`: The MCP server instance handling the request
+- `request::Request`: The parsed JSON-RPC request to process
+
+# Behavior
+This function creates a request context, then dispatches the request to the appropriate
+handler based on the request method. Supported methods include:
+- `initialize`: Server initialization
+- `resources/list`: List available resources
+- `resources/read`: Read a specific resource
+- `tools/list`: List available tools
+- `tools/call`: Invoke a specific tool
+- `prompts/list`: List available prompts
+- `prompts/get`: Get a specific prompt
+
+If an unknown method is received, a METHOD_NOT_FOUND error is returned.
+Any exceptions thrown during processing are caught and converted to INTERNAL_ERROR responses.
+
+# Returns
+- `Response`: Either a successful response or an error response depending on the handler result
+"""
 function handle_request(server::Server, request::Request)::Response
     ctx = RequestContext(
         server=server,
@@ -631,8 +657,8 @@ function handle_request(server::Server, request::Request)::Response
         end
     catch e
         logger = MCPLogger(stderr)
-        logger.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
-        JSONRPCError(
+        Logging.handle_message(logger, Error, Dict("exception" => e), @__MODULE__, nothing, nothing, @__FILE__, @__LINE__)
+        return JSONRPCError(
             id=ctx.request_id,
             error=ErrorInfo(
                 code=ErrorCodes.INTERNAL_ERROR,
