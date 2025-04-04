@@ -126,6 +126,27 @@ function handle_initialize(ctx::RequestContext, params::InitializeParams)::Handl
 end
 
 """
+    handle_ping(ctx::RequestContext, params::Nothing) -> HandlerResult
+
+Handle MCP protocol ping requests.
+
+# Arguments
+- `ctx::RequestContext`: The current request context
+- `params::Nothing`: The ping parameters does not contain any data
+
+# Returns
+- `HandlerResult`: Ping returns an empty response payload
+"""
+function handle_ping(ctx::RequestContext, ::Nothing)::HandlerResult
+    HandlerResult(
+        response=JSONRPCResponse(
+            id=ctx.request_id,
+            result=Dict{String,Any}()
+        )
+    )
+end
+
+"""
     handle_list_prompts(ctx::RequestContext, params::ListPromptsParams) -> HandlerResult
 
 Handle requests to list available prompts on the MCP server.
@@ -628,6 +649,8 @@ function handle_request(server::Server, request::Request)::Response
         result =
             if request.method == "initialize"
                 handle_initialize(ctx, request.params::InitializeParams)
+            elseif request.method == "ping"
+                handle_ping(ctx, request.params::Nothing)
             elseif request.method == "resources/list"
                 handle_list_resources(ctx, request.params::ListResourcesParams)
             elseif request.method == "resources/read"

@@ -301,7 +301,7 @@ JSON-RPC request message used to invoke methods on the server.
 Base.@kwdef struct JSONRPCRequest <: Request
     id::RequestId
     method::String
-    params::Union{RequestParams, Nothing}
+    params::Union{RequestParams, Nothing} = nothing
     meta::RequestMeta = RequestMeta()
 end
 
