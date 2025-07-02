@@ -7,5 +7,6 @@ julia_version_tool = MCPTool(
     description = "Get the Julia version used to run this tool",
     parameters = [],
     # Return Dict directly - it will be automatically converted to TextContent
-    handler = params -> Dict("version" => string(VERSION))
+    handler = params -> Dict("version" => string(VERSION)),
+    return_type = TextContent  # Explicitly expect single TextContent
 )

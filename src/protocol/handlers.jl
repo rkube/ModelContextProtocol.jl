@@ -42,6 +42,35 @@ Base.@kwdef struct HandlerResult
 end
 
 """
+    serialize_resource_contents(resource::ResourceContents) -> Dict{String,Any}
+
+Serialize resource contents to protocol format.
+
+# Arguments
+- `resource::ResourceContents`: The resource contents to serialize
+
+# Returns
+- `Dict{String,Any}`: The serialized resource contents
+"""
+function serialize_resource_contents(resource::ResourceContents)
+    if resource isa TextResourceContents
+        Dict{String,Any}(
+            "uri" => resource.uri,
+            "text" => resource.text,
+            "mimeType" => resource.mime_type
+        )
+    elseif resource isa BlobResourceContents
+        Dict{String,Any}(
+            "uri" => resource.uri,
+            "blob" => base64encode(resource.blob),
+            "mimeType" => resource.mime_type
+        )
+    else
+        throw(ArgumentError("Unknown resource contents type: $(typeof(resource))"))
+    end
+end
+
+"""
     convert_to_content_type(result::Any, return_type::Type) -> Content
 
 Convert various return types to the appropriate MCP Content type.
@@ -492,27 +521,80 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         # Apply automatic conversion to the expected return type
         result = convert_to_content_type(result, tool.return_type)
 
+        # Check if result is a vector of content or single content
+        is_vector = result isa Vector && all(x -> x isa Content, result)
+        
         # Validate return type matches what's declared
-        if !(result isa tool.return_type)
-            throw(ArgumentError("Tool returned $(typeof(result)), expected $(tool.return_type)"))
+        if is_vector
+            # Check if return type accepts vectors of content
+            # We need to check if the actual type or Vector{Content} is accepted
+            if !(typeof(result) <: tool.return_type) && !(Vector{Content} <: tool.return_type)
+                throw(ArgumentError("Tool returned $(typeof(result)), but return_type is $(tool.return_type)"))
+            end
+        elseif result isa Content
+            # Single content - check if it matches declared type or if Vector was expected
+            if tool.return_type <: Vector
+                # If Vector was expected but single content returned, wrap it
+                result = [result]
+                is_vector = true
+            elseif !(result isa tool.return_type)
+                throw(ArgumentError("Tool returned $(typeof(result)), expected $(tool.return_type)"))
+            end
+        else
+            throw(ArgumentError("Tool must return Content or Vector{<:Content}, got $(typeof(result))"))
         end
 
         # Convert content to protocol format
-        content = if result isa ImageContent
-            [Dict{String,Any}(
-                "type" => "image",
-                "data" => base64encode(result.data),
-                "mimeType" => result.mime_type,
-                "annotations" => result.annotations
-            )]
-        elseif result isa TextContent
-            [Dict{String,Any}(
-                "type" => "text",
-                "text" => result.text,
-                "annotations" => result.annotations
-            )]
+        content = if is_vector
+            # Handle vector of content items
+            map(result) do item
+                if item isa ImageContent
+                    Dict{String,Any}(
+                        "type" => "image",
+                        "data" => base64encode(item.data),
+                        "mimeType" => item.mime_type,
+                        "annotations" => item.annotations
+                    )
+                elseif item isa TextContent
+                    Dict{String,Any}(
+                        "type" => "text",
+                        "text" => item.text,
+                        "annotations" => item.annotations
+                    )
+                elseif item isa EmbeddedResource
+                    Dict{String,Any}(
+                        "type" => "resource",
+                        "resource" => serialize_resource_contents(item.resource),
+                        "annotations" => item.annotations
+                    )
+                else
+                    throw(ArgumentError("Unsupported content type in vector: $(typeof(item))"))
+                end
+            end
         else
-            throw(ArgumentError("Unsupported content type: $(typeof(result))"))
+            # Handle single content item (backward compatibility)
+            if result isa ImageContent
+                [Dict{String,Any}(
+                    "type" => "image",
+                    "data" => base64encode(result.data),
+                    "mimeType" => result.mime_type,
+                    "annotations" => result.annotations
+                )]
+            elseif result isa TextContent
+                [Dict{String,Any}(
+                    "type" => "text",
+                    "text" => result.text,
+                    "annotations" => result.annotations
+                )]
+            elseif result isa EmbeddedResource
+                [Dict{String,Any}(
+                    "type" => "resource",
+                    "resource" => serialize_resource_contents(result.resource),
+                    "annotations" => result.annotations
+                )]
+            else
+                throw(ArgumentError("Unsupported content type: $(typeof(result))"))
+            end
         end
 
         HandlerResult(

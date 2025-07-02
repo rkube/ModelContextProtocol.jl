@@ -9,7 +9,8 @@ time_tool = MCPTool(
     name = "current_time",
     description = "Get Current Date and Time",
     parameters = [],
-    handler = params -> Dict("time" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"))
+    handler = params -> Dict("time" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")),
+    return_type = TextContent  # Explicitly expect single TextContent
 )
 
 # Define a resource 

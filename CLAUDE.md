@@ -5,7 +5,9 @@
 - Test all: `using Pkg; Pkg.test("ModelContextProtocol")`
 - Test single: `julia --project -e 'using Pkg; Pkg.test("ModelContextProtocol", test_args=["specific_test.jl"])'`
 - Documentation: `julia --project=docs docs/make.jl`
+- Documentation deployment: Automatic via GitHub Actions on push to main
 - REPL: `using ModelContextProtocol` after activating project
+- Example server: `julia --project examples/multi_content_tool.jl`
 
 ## Code Style
 - Imports: Group related imports (e.g., `using JSON3, URIs, DataStructures`)
@@ -51,3 +53,11 @@
 - Organization: Follow modular structure with core, features, protocol, utils
 - Type annotations: Use for function parameters and struct fields
 - Constants: Use UPPER_CASE for true constants
+
+## Key Features
+- **Multi-Content Tool Returns**: Tools can return either a single `Content` object or a `Vector{<:Content}` for multiple items
+  - Single: `return TextContent(text = "result")`
+  - Multiple: `return [TextContent(text = "item1"), ImageContent(data = ..., mime_type = "image/png")]`
+  - Mixed content types in same response supported
+  - Default `return_type` is `Vector{Content}` - single items are auto-wrapped
+  - Set `return_type = TextContent` to validate single content returns

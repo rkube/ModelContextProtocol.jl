@@ -27,7 +27,8 @@ const TEST_TOOL = MCPTool(
     name="test-tool",
     description="Test tool",
     parameters=[ToolParameter(name="param1", description="Test param", type="string", required=true)],
-    handler=args -> "Test response: $(args["param1"])"
+    handler=args -> "Test response: $(args["param1"])",
+    return_type=TextContent  # Explicitly specify return type
 )
 
 
@@ -235,4 +236,7 @@ const TEST_TOOL = MCPTool(
         @test !isnothing(result.response)
         @test result.response.result isa ReadResourceResult
     end
+    
+    # Include multi-content tests
+    include("test_multi_content.jl")
 end
