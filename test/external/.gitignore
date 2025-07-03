@@ -1,0 +1,10 @@
+# CondaPkg environment
+.CondaPkg/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temporary files
+*.log
+.DS_Store

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(julia:*)"
+      "Bash(julia:*)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:spec.modelcontextprotocol.io)"
     ],
     "deny": []
   }

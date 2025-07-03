@@ -123,7 +123,8 @@ start!(server)
         julia_exe = Base.julia_cmd().exec[1]
         
         # Run the Python client test
-        pyexec = pyeval(PYTHON_CLIENT_CODE)
+        py_globals = pydict()
+        pyexec(PYTHON_CLIENT_CODE, py_globals)
         
         @testset "Basic MCP Communication" begin
             # Note: This test requires the server to be running
@@ -134,7 +135,7 @@ start!(server)
             @test !isnothing(mcp)
             
             # Test that we can create the client function
-            run_test_func = pyeval("run_test", pyexec)
+            run_test_func = get(py_globals, "run_test", nothing)
             @test !isnothing(run_test_func)
             
             # In a full test, we would:

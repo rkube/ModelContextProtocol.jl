@@ -1,7 +1,7 @@
 # src/features/tools.jl
 
 """
-    ToolParameter(; name::String, description::String, type::String, required::Bool=false)
+    ToolParameter(; name::String, description::String, type::String, required::Bool=false, default::Any=nothing)
 
 Define a parameter for an MCP tool.
 
@@ -10,12 +10,14 @@ Define a parameter for an MCP tool.
 - `description::String`: Human-readable description of the parameter
 - `type::String`: Type of the parameter as specified in the MCP schema (e.g., "string", "number", "boolean")
 - `required::Bool`: Whether the parameter is required for tool invocation
+- `default::Any`: Default value for the parameter if not provided (nothing means no default)
 """
 Base.@kwdef struct ToolParameter
     name::String
     description::String
     type::String 
     required::Bool = false
+    default::Any = nothing
 end
 
 """

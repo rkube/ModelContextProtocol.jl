@@ -9,7 +9,7 @@ import sys
 import subprocess
 
 def test_stdio_communication(julia_exe, server_script):
-    """Test basic stdio communication with Julia MCP server"""
+    \"\"\"Test basic stdio communication with Julia MCP server\"\"\"
     
     # Start the Julia server as a subprocess
     proc = subprocess.Popen(
@@ -34,7 +34,7 @@ def test_stdio_communication(julia_exe, server_script):
         }
         
         # Write request to stdin
-        proc.stdin.write(json.dumps(init_request) + '\n')
+        proc.stdin.write(json.dumps(init_request) + '\\n')
         proc.stdin.flush()
         
         # Read response from stdout
@@ -116,8 +116,9 @@ handle_stdin_message(server)
         chmod(server_file, 0o755)
         
         # Get test function from Python
-        pyexec = pyeval(PYTHON_STDIO_TEST)
-        test_func = pyeval("test_stdio_communication", pyexec)
+        py_globals = pydict()
+        pyexec(PYTHON_STDIO_TEST, py_globals)
+        test_func = py_globals["test_stdio_communication"]
         
         # Get Julia executable
         julia_exe = Base.julia_cmd().exec[1]

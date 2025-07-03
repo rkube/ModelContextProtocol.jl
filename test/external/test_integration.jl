@@ -14,7 +14,7 @@ function ensure_python_deps()
 end
 
 # Python test client code
-const PYTHON_TEST_CLIENT = py"""
+const PYTHON_TEST_CLIENT = """
 import asyncio
 import json
 import sys
@@ -172,10 +172,10 @@ start!(server)
                 timeout=30
             )
             
-            if result.returncode != 0
+            if pyconvert(Int, result.returncode) != 0
                 println("STDOUT: ", result.stdout)
                 println("STDERR: ", result.stderr)
-                @test false "Python client failed with return code $(result.returncode)"
+                @test false  # Python client failed
             else
                 # Parse the JSON result
                 output = pyconvert(String, result.stdout)

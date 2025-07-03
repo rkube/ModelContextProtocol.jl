@@ -515,8 +515,18 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     tool = ctx.server.tools[tool_idx]
 
     try
+        # Apply default values to arguments if not provided
+        args = isnothing(params.arguments) ? Dict{String,Any}() : copy(params.arguments)
+        
+        # Apply defaults for parameters that have them
+        for param in tool.parameters
+            if !isnothing(param.default) && !haskey(args, param.name)
+                args[param.name] = param.default
+            end
+        end
+        
         # Call the tool handler with the arguments
-        result = tool.handler(params.arguments)
+        result = tool.handler(args)
         
         # Apply automatic conversion to the expected return type
         result = convert_to_content_type(result, tool.return_type)
@@ -637,10 +647,17 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
                 "inputSchema" => Dict{String,Any}(
                     "type" => "object",
                     "properties" => Dict(
-                        param.name => Dict{String,Any}(
-                            "type" => param.type,
-                            "description" => param.description
-                        ) for param in tool.parameters
+                        param.name => begin
+                            schema = Dict{String,Any}(
+                                "type" => param.type,
+                                "description" => param.description
+                            )
+                            # Add default value to schema if it exists
+                            if !isnothing(param.default)
+                                schema["default"] = param.default
+                            end
+                            schema
+                        end for param in tool.parameters
                     ),
                     "required" => [p.name for p in tool.parameters if p.required]
                 )
