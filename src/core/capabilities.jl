@@ -139,30 +139,8 @@ function capabilities_to_protocol(capabilities::Vector{Capability}, server::Serv
         end
     end
     
-    # Then add available tools under their names
-    if haskey(result, "tools") && !isempty(server.tools)
-        tools_dict = result["tools"]  # Get existing dict with listChanged
-        result["tools"] = Dict{String,Any}(
-            "listChanged" => tools_dict["listChanged"]  # Put listChanged first
-        )
-        # Then add tools
-        for tool in server.tools
-            result["tools"][tool.name] = Dict{String,Any}(
-                "name" => tool.name,
-                "description" => tool.description,
-                "inputSchema" => Dict{String,Any}(
-                    "type" => "object",
-                    "properties" => Dict(
-                        param.name => Dict{String,Any}(
-                            "type" => param.type,
-                            "description" => param.description
-                        ) for param in tool.parameters
-                    ),
-                    "required" => [p.name for p in tool.parameters if p.required]
-                )
-            )
-        end
-    end
+    # Note: Tools are NOT included in the initialization response per MCP spec
+    # They should only be returned via the tools/list request
 
     # Add available resources array
     if haskey(result, "resources") && !isempty(server.resources)

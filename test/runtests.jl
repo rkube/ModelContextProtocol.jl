@@ -239,4 +239,7 @@ const TEST_TOOL = MCPTool(
     
     # Include multi-content tests
     include("test_multi_content.jl")
+    
+    # Include null params tests - some clients like Cursor send null params for list requests
+    include("test_null_params.jl")
 end

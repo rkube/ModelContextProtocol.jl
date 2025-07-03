@@ -61,3 +61,6 @@
   - Mixed content types in same response supported
   - Default `return_type` is `Vector{Content}` - single items are auto-wrapped
   - Set `return_type = TextContent` to validate single content returns
+- **MCP Protocol Compliance**: Tools are only returned via `tools/list` request, not in initialization response
+  - Initialization response only indicates tool support with `{"tools": {"listChanged": true/false}}`
+  - Clients must call `tools/list` after initialization to discover available tools

@@ -734,15 +734,21 @@ function handle_request(server::Server, request::Request)::Response
             elseif request.method == "ping"
                 handle_ping(ctx, request.params::Nothing)
             elseif request.method == "resources/list"
-                handle_list_resources(ctx, request.params::ListResourcesParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListResourcesParams() : request.params::ListResourcesParams
+                handle_list_resources(ctx, params)
             elseif request.method == "resources/read"
                 handle_read_resource(ctx, request.params::ReadResourceParams)
             elseif request.method == "tools/call"
                 handle_call_tool(ctx, request.params::CallToolParams)
             elseif request.method == "tools/list"
-                handle_list_tools(ctx, request.params::ListToolsParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListToolsParams() : request.params::ListToolsParams
+                handle_list_tools(ctx, params)
             elseif request.method == "prompts/list"
-                handle_list_prompts(ctx, request.params::ListPromptsParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListPromptsParams() : request.params::ListPromptsParams
+                handle_list_prompts(ctx, params)
             elseif request.method == "prompts/get"
                 handle_get_prompt(ctx, request.params::GetPromptParams)
             else
