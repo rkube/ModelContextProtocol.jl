@@ -91,6 +91,9 @@ using JSON3
         @test content[2]["mimeType"] == "image/png"
         @test content[3]["type"] == "text"
         @test content[3]["text"] == "Third item"
+
+        @test contains(JSON3.write(result.response.result), "Third item")
+        @test contains(JSON3.write(result.response.result), "image/png")
     end
     
     @testset "Mixed return types" begin

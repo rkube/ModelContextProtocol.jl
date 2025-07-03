@@ -9,6 +9,31 @@
 - REPL: `using ModelContextProtocol` after activating project
 - Example server: `julia --project examples/multi_content_tool.jl`
 
+## Project Structure
+```
+src/
+├── ModelContextProtocol.jl     # Main module entry point
+├── core/                       # Core server functionality
+│   ├── capabilities.jl         # Protocol capability management
+│   ├── init.jl                 # Initialization logic
+│   ├── server.jl               # Server implementation
+│   ├── server_types.jl         # Server-specific types
+│   └── types.jl                # Core type definitions
+├── features/                   # MCP feature implementations
+│   ├── prompts.jl              # Prompt handling
+│   ├── resources.jl            # Resource management
+│   └── tools.jl                # Tool implementation
+├── protocol/                   # JSON-RPC protocol layer
+│   ├── handlers.jl             # Request handlers
+│   ├── jsonrpc.jl              # JSON-RPC implementation
+│   └── messages.jl             # Protocol message types
+├── types.jl                    # Public type exports
+└── utils/                      # Utility functions
+    ├── errors.jl               # Error handling
+    ├── logging.jl              # MCP-compliant logging
+    └── serialization.jl        # Message serialization
+```
+
 ## Code Style
 - Imports: Group related imports (e.g., `using JSON3, URIs, DataStructures`)
 - Types: Use abstract type hierarchy, concrete types with `Base.@kwdef`
@@ -64,3 +89,85 @@
 - **MCP Protocol Compliance**: Tools are only returned via `tools/list` request, not in initialization response
   - Initialization response only indicates tool support with `{"tools": {"listChanged": true/false}}`
   - Clients must call `tools/list` after initialization to discover available tools
+- **Tool Parameter Defaults**: Tool parameters can have default values specified in ToolParameter struct
+  - Define using `default` field: `ToolParameter(name="timeout", type="number", default=30.0)`
+  - Handler automatically applies defaults when parameters are not provided
+  - Defaults are included in the tool schema returned by `tools/list`
+
+## Progress Monitoring Capabilities
+
+### Current Implementation
+The ModelContextProtocol.jl package includes infrastructure for progress monitoring, but with significant limitations:
+
+1. **Types and Structures**:
+   - `ProgressToken` type alias: `Union{String,Int}` for tracking operations
+   - `Progress` struct: Contains `token`, `current`, `total`, and optional `message` fields
+   - `ProgressParams` struct: Used for progress notifications with token, progress value, and optional total
+   - `RequestMeta` struct: Contains optional `progress_token` field for request tracking
+
+2. **Server Infrastructure**:
+   - Server maintains `progress_trackers::Dict{Union{String,Int}, Progress}` for tracking ongoing operations
+   - Request handlers receive `RequestContext` with optional `progress_token` from the request metadata
+
+3. **Protocol Support**:
+   - JSON-RPC notification handler recognizes `"notifications/progress"` method
+   - Progress notification messages are defined in the protocol layer
+
+### Current Limitations
+
+1. **No Outbound Notification Mechanism**:
+   - The server can receive and process notifications but cannot send them to clients
+   - The `process_message` function only handles stdin→stdout request/response flow
+   - No `send_notification` or similar function exists for pushing updates to clients
+
+2. **Tool Handler Constraints**:
+   - Tool handlers execute synchronously and return a single result
+   - No access to server context or communication channels within handlers
+   - Cannot emit progress updates during long-running operations
+
+3. **Missing Implementation**:
+   - The `handle_notification` function for `"notifications/progress"` is empty (no-op)
+   - No examples or documentation showing progress monitoring usage
+   - Progress trackers are maintained in server state but never utilized
+
+### Potential Implementation Approaches
+
+1. **Server Context Enhancement**:
+   ```julia
+   # Add notification capability to RequestContext
+   mutable struct RequestContext
+       server::Server
+       request_id::Union{RequestId,Nothing}
+       progress_token::Union{ProgressToken,Nothing}
+       notification_channel::Union{Channel,Nothing}  # New field
+   end
+   ```
+
+2. **Asynchronous Tool Execution**:
+   ```julia
+   # Modified tool handler pattern
+   handler = function(params, ctx::RequestContext)
+       # Can send progress notifications via ctx.notification_channel
+       if !isnothing(ctx.progress_token)
+           put!(ctx.notification_channel, ProgressNotification(...))
+       end
+   end
+   ```
+
+3. **Bidirectional Communication**:
+   - Implement a notification queue alongside the request/response flow
+   - Add a `send_notification` function that writes to stdout
+   - Ensure thread-safe access to stdout for concurrent notifications
+
+4. **Alternative Workarounds**:
+   - Return partial results as streaming content
+   - Use resource subscriptions for status updates
+   - Implement polling-based progress checking via separate tool calls
+
+### Recommendations for Implementation
+
+1. **Short-term**: Document the current limitations clearly in tool implementations
+2. **Medium-term**: Add server context access to tool handlers for future extensibility
+3. **Long-term**: Implement full bidirectional communication with proper notification support
+
+The infrastructure exists but requires additional implementation to enable progress monitoring from within tool handlers.
