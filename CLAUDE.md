@@ -93,6 +93,11 @@ src/
   - Define using `default` field: `ToolParameter(name="timeout", type="number", default=30.0)`
   - Handler automatically applies defaults when parameters are not provided
   - Defaults are included in the tool schema returned by `tools/list`
+- **Direct CallToolResult Returns**: Tool handlers can return CallToolResult objects directly
+  - Provides full control over response structure including error handling
+  - Example: `return CallToolResult(content=[...], is_error=true)`
+  - When returning CallToolResult, the tool's return_type field is ignored
+  - Useful for tools that need to indicate errors or complex response patterns
 
 ## Progress Monitoring Capabilities
 

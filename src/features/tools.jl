@@ -40,8 +40,10 @@ The tool handler can return various types which are automatically converted:
 - A Dict (automatically converted to JSON and wrapped in TextContent)
 - A String (automatically wrapped in TextContent)
 - A Tuple{Vector{UInt8}, String} (automatically wrapped in ImageContent)
+- A CallToolResult object for full control over the response (including error handling)
 
 When return_type is Vector{Content} (default), single Content items are automatically wrapped in a vector.
+Note: When returning CallToolResult directly, the return_type field is ignored.
 """
 Base.@kwdef struct MCPTool <: Tool
     name::String

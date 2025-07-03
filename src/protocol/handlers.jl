@@ -528,6 +528,17 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         # Call the tool handler with the arguments
         result = tool.handler(args)
         
+        # Check if the handler returned a complete CallToolResult
+        if result isa CallToolResult
+            # Handler returned a complete result, use it directly
+            return HandlerResult(
+                response=JSONRPCResponse(
+                    id=ctx.request_id,
+                    result=result
+                )
+            )
+        end
+        
         # Apply automatic conversion to the expected return type
         result = convert_to_content_type(result, tool.return_type)
 

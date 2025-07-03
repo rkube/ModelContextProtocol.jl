@@ -242,4 +242,7 @@ const TEST_TOOL = MCPTool(
     
     # Include null params tests - some clients like Cursor send null params for list requests
     include("test_null_params.jl")
+    
+    # Include CallToolResult return type tests
+    include("test_calltoolresult_return.jl")
 end
