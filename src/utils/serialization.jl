@@ -55,3 +55,56 @@ function StructTypes.omitempties(::Type{ListPromptsResult})
     (:nextCursor,)
 end
 
+"""
+    content2dict(content::Content) -> Dict{String,Any}
+
+Convert a Content object to its dictionary representation for JSON serialization.
+
+# Arguments
+- `content::Content`: The content object to convert
+
+# Returns
+- `Dict{String,Any}`: Dictionary representation of the content
+
+# Examples
+```julia
+text_content = TextContent(text="Hello", type="text")
+dict = content2dict(text_content)
+# Returns: Dict("type" => "text", "text" => "Hello", "annotations" => Dict())
+```
+"""
+function content2dict end
+
+# TextContent conversion
+function content2dict(content::TextContent)
+    Dict{String,Any}(
+        "type" => "text",
+        "text" => content.text,
+        "annotations" => content.annotations
+    )
+end
+
+# ImageContent conversion
+function content2dict(content::ImageContent)
+    Dict{String,Any}(
+        "type" => "image",
+        "data" => base64encode(content.data),
+        "mimeType" => content.mime_type,
+        "annotations" => content.annotations
+    )
+end
+
+# EmbeddedResource conversion
+function content2dict(content::EmbeddedResource)
+    Dict{String,Any}(
+        "type" => "resource",
+        "resource" => serialize_resource_contents(content.resource),
+        "annotations" => content.annotations
+    )
+end
+
+# Generic fallback for unknown content types
+function content2dict(content::Content)
+    throw(ArgumentError("Unsupported content type: $(typeof(content))"))
+end
+

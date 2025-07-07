@@ -41,6 +41,10 @@ src/
   - PascalCase for types (e.g., `MCPTool`, `TextContent`)
   - snake_case for functions and variables (e.g., `mcp_server`, `request_id`)
   - Use descriptive names that reflect purpose
+- Utility Functions:
+  - `content2dict(content::Content)`: Convert Content objects to Dict for JSON serialization
+  - Uses multiple dispatch for different content types (TextContent, ImageContent, EmbeddedResource)
+  - Automatically handles base64 encoding for binary data
 - Documentation: 
   - Add full docstrings for all types and methods
   - Use imprative phrasing for the one line description in docstrings "Scan a directory" not "Scans a directory"

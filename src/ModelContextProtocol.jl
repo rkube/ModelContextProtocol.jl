@@ -82,6 +82,7 @@ export
     # Utils
     MCPLogger, init_logging,
     ErrorCodes,  # Export error codes module
+    content2dict,  # Export content serialization function
 
     # Handlers
     HandlerResult, RequestContext

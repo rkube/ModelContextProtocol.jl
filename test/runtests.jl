@@ -245,4 +245,7 @@ const TEST_TOOL = MCPTool(
     
     # Include CallToolResult return type tests
     include("test_calltoolresult_return.jl")
+    
+    # Include content2dict tests
+    include("test_content2dict.jl")
 end

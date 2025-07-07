@@ -568,54 +568,10 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
         # Convert content to protocol format
         content = if is_vector
             # Handle vector of content items
-            map(result) do item
-                if item isa ImageContent
-                    Dict{String,Any}(
-                        "type" => "image",
-                        "data" => base64encode(item.data),
-                        "mimeType" => item.mime_type,
-                        "annotations" => item.annotations
-                    )
-                elseif item isa TextContent
-                    Dict{String,Any}(
-                        "type" => "text",
-                        "text" => item.text,
-                        "annotations" => item.annotations
-                    )
-                elseif item isa EmbeddedResource
-                    Dict{String,Any}(
-                        "type" => "resource",
-                        "resource" => serialize_resource_contents(item.resource),
-                        "annotations" => item.annotations
-                    )
-                else
-                    throw(ArgumentError("Unsupported content type in vector: $(typeof(item))"))
-                end
-            end
+            map(content2dict, result)
         else
             # Handle single content item (backward compatibility)
-            if result isa ImageContent
-                [Dict{String,Any}(
-                    "type" => "image",
-                    "data" => base64encode(result.data),
-                    "mimeType" => result.mime_type,
-                    "annotations" => result.annotations
-                )]
-            elseif result isa TextContent
-                [Dict{String,Any}(
-                    "type" => "text",
-                    "text" => result.text,
-                    "annotations" => result.annotations
-                )]
-            elseif result isa EmbeddedResource
-                [Dict{String,Any}(
-                    "type" => "resource",
-                    "resource" => serialize_resource_contents(result.resource),
-                    "annotations" => result.annotations
-                )]
-            else
-                throw(ArgumentError("Unsupported content type: $(typeof(result))"))
-            end
+            [content2dict(result)]
         end
 
         HandlerResult(
