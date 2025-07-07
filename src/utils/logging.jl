@@ -70,15 +70,15 @@ function Logging.handle_message(logger::MCPLogger, level, message, _module, grou
     
     # Create JSON-RPC formatted log message
     buf = IOBuffer()
-    log_message = Dict{String,Any}(
+    log_message = LittleDict{String,Any}(
         "jsonrpc" => "2.0",
         "method" => "notifications/message",
-        "params" => Dict{String,Any}(
+        "params" => LittleDict{String,Any}(
             "level" => mcp_level,
-            "data" => Dict{String,Any}(
+            "data" => LittleDict{String,Any}(
                 "message" => string(message),
                 "timestamp" => Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"),
-                "metadata" => Dict{String,Any}(
+                "metadata" => LittleDict{String,Any}(
                     "module" => string(_module),
                     "file" => string(filepath),
                     "line" => line

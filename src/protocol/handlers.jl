@@ -54,13 +54,13 @@ Serialize resource contents to protocol format.
 """
 function serialize_resource_contents(resource::ResourceContents)
     if resource isa TextResourceContents
-        Dict{String,Any}(
+        LittleDict{String,Any}(
             "uri" => resource.uri,
             "text" => resource.text,
             "mimeType" => resource.mime_type
         )
     elseif resource isa BlobResourceContents
-        Dict{String,Any}(
+        LittleDict{String,Any}(
             "uri" => resource.uri,
             "blob" => base64encode(resource.blob),
             "mimeType" => resource.mime_type
@@ -88,7 +88,7 @@ function convert_to_content_type(result::Any, return_type::Type)
         return TextContent(
             type = "text",
             text = JSON3.write(result),
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -97,7 +97,7 @@ function convert_to_content_type(result::Any, return_type::Type)
         return TextContent(
             type = "text",
             text = result,
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -108,7 +108,7 @@ function convert_to_content_type(result::Any, return_type::Type)
             type = "image",
             data = data,
             mime_type = mime_type,
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -170,7 +170,7 @@ function handle_ping(ctx::RequestContext, ::Nothing)::HandlerResult
     HandlerResult(
         response=JSONRPCResponse(
             id=ctx.request_id,
-            result=Dict{String,Any}()
+            result=LittleDict{String,Any}()
         )
     )
 end
@@ -190,10 +190,10 @@ Handle requests to list available prompts on the MCP server.
 function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::HandlerResult
     try
         prompts = map(ctx.server.prompts) do prompt::MCPPrompt
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "name" => prompt.name,
                 "description" => prompt.description,
-                "arguments" => [Dict{String,Any}(
+                "arguments" => [LittleDict{String,Any}(
                     "name" => arg.name,
                     "description" => arg.description,
                     "required" => arg.required
@@ -201,7 +201,7 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
             )
         end
 
-        result = Dict{String,Any}(
+        result = LittleDict{String,Any}(
             "prompts" => prompts
         )
 
@@ -320,7 +320,7 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         end
 
         # Get the arguments (empty dict if none provided)
-        args = params.arguments isa Nothing ? Dict{String,String}() : params.arguments
+        args = params.arguments isa Nothing ? LittleDict{String,String}() : params.arguments
 
         # Process messages with template processor
         processed_messages = map(prompt.messages) do msg
@@ -377,12 +377,12 @@ Handle requests to list all available resources on the MCP server.
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
         resources = map(ctx.server.resources) do resource::MCPResource
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "uri" => string(resource.uri),
                 "name" => resource.name,
                 "mimeType" => resource.mime_type,
                 "description" => resource.description,
-                "annotations" => Dict{String,Any}(
+                "annotations" => LittleDict{String,Any}(
                     "audience" => get(resource.annotations, "audience", ["assistant"]),
                     "priority" => get(resource.annotations, "priority", 0.0)
                 )
@@ -390,7 +390,7 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
         end
 
         # Create the result dictionary explicitly
-        result_dict = Dict{String,Any}(
+        result_dict = LittleDict{String,Any}(
             "resources" => resources
         )
 
@@ -462,7 +462,7 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
     try
         data = resource.data_provider()
         
-        contents = [Dict{String,Any}(
+        contents = [LittleDict{String,Any}(
             "uri" => string(resource.uri),
             "text" => JSON3.write(data),
             "mimeType" => resource.mime_type
@@ -516,7 +516,7 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
 
     try
         # Apply default values to arguments if not provided
-        args = isnothing(params.arguments) ? Dict{String,Any}() : copy(params.arguments)
+        args = isnothing(params.arguments) ? LittleDict{String,Any}() : copy(params.arguments)
         
         # Apply defaults for parameters that have them
         for param in tool.parameters
@@ -608,14 +608,14 @@ Handle requests to list all available tools on the MCP server.
 function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::HandlerResult
     try
         tools = map(ctx.server.tools) do tool
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "name" => tool.name,
                 "description" => tool.description,
-                "inputSchema" => Dict{String,Any}(
+                "inputSchema" => LittleDict{String,Any}(
                     "type" => "object",
                     "properties" => Dict(
                         param.name => begin
-                            schema = Dict{String,Any}(
+                            schema = LittleDict{String,Any}(
                                 "type" => param.type,
                                 "description" => param.description
                             )
@@ -631,7 +631,7 @@ function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::Handle
             )
         end
 
-        result = Dict{String,Any}(
+        result = LittleDict{String,Any}(
             "tools" => tools
         )
 

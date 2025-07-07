@@ -28,7 +28,7 @@ Resources represent data that can be read by models and tools.
 - `description::String`: Detailed description of the resource
 - `mime_type::String`: MIME type of the resource data
 - `data_provider::Function`: Function that provides the resource data when called
-- `annotations::Dict{String,Any}`: Additional metadata for the resource
+- `annotations::AbstractDict{String,Any}`: Additional metadata for the resource
 """
 struct MCPResource <: Resource
     uri::URI
@@ -36,12 +36,12 @@ struct MCPResource <: Resource
     description::String
     mime_type::String
     data_provider::Function
-    annotations::Dict{String,Any}
+    annotations::AbstractDict{String,Any}
 end
 
 """
     MCPResource(; uri, name, description="", mime_type="application/json", 
-              data_provider, annotations=Dict{String,Any}()) -> MCPResource
+              data_provider, annotations=LittleDict{String,Any}()) -> MCPResource
 
 Create a resource with automatic URI conversion from strings.
 
@@ -62,7 +62,7 @@ function MCPResource(;
     description = "",
     mime_type = "application/json",
     data_provider,
-    annotations = Dict{String,Any}()
+    annotations = LittleDict{String,Any}()
 )
     uri_val = uri isa String ? URI(uri) : uri
     return MCPResource(uri_val, name, description, mime_type, data_provider, annotations)

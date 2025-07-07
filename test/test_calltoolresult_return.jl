@@ -5,6 +5,7 @@ using ModelContextProtocol
 using ModelContextProtocol: handle_call_tool, RequestContext, CallToolParams, CallToolResult
 using JSON3
 using Base64: base64encode
+using OrderedCollections: LittleDict
 
 @testset "CallToolResult return type" begin
     # Create a server with tools that return CallToolResult directly
@@ -30,7 +31,7 @@ using Base64: base64encode
                 handler = function(params)
                     msg = get(params, "message", "Success!")
                     CallToolResult(
-                        content = [Dict{String,Any}(
+                        content = [LittleDict{String,Any}(
                             "type" => "text",
                             "text" => msg
                         )],
@@ -46,7 +47,7 @@ using Base64: base64encode
                 parameters = [],
                 handler = function(params)
                     CallToolResult(
-                        content = [Dict{String,Any}(
+                        content = [LittleDict{String,Any}(
                             "type" => "text",
                             "text" => "An error occurred"
                         )],
@@ -63,15 +64,15 @@ using Base64: base64encode
                 handler = function(params)
                     CallToolResult(
                         content = [
-                            Dict{String,Any}(
+                            LittleDict{String,Any}(
                                 "type" => "text",
                                 "text" => "First item"
                             ),
-                            Dict{String,Any}(
+                            LittleDict{String,Any}(
                                 "type" => "text",
                                 "text" => "Second item"
                             ),
-                            Dict{String,Any}(
+                            LittleDict{String,Any}(
                                 "type" => "image",
                                 "data" => base64encode([0x89, 0x50, 0x4E, 0x47]),
                                 "mimeType" => "image/png"
@@ -96,7 +97,7 @@ using Base64: base64encode
         
         params = CallToolParams(
             name = "success_tool",
-            arguments = Dict{String,Any}("message" => "Hello from test!")
+            arguments = LittleDict{String,Any}("message" => "Hello from test!")
         )
         
         result = handle_call_tool(ctx, params)

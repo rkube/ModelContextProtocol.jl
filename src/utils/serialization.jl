@@ -77,7 +77,7 @@ function content2dict end
 
 # TextContent conversion
 function content2dict(content::TextContent)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "type" => "text",
         "text" => content.text,
         "annotations" => content.annotations
@@ -86,7 +86,7 @@ end
 
 # ImageContent conversion
 function content2dict(content::ImageContent)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "type" => "image",
         "data" => base64encode(content.data),
         "mimeType" => content.mime_type,
@@ -96,7 +96,7 @@ end
 
 # EmbeddedResource conversion
 function content2dict(content::EmbeddedResource)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "type" => "resource",
         "resource" => serialize_resource_contents(content.resource),
         "annotations" => content.annotations

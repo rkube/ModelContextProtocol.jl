@@ -1,6 +1,7 @@
 using Test
 using ModelContextProtocol
 using JSON3
+using OrderedCollections: LittleDict
 
 @testset "Multi-Content Tool Tests" begin
     # Test tool that returns a single content item but expects it wrapped in a vector
@@ -136,7 +137,7 @@ using JSON3
                         text = "Resource data",
                         mime_type = "text/plain"
                     ),
-                    annotations = Dict("priority" => "high")
+                    annotations = LittleDict{String,Any}("priority" => "high")
                 )
             ],
             return_type = Vector{Content}

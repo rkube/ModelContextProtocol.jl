@@ -53,7 +53,7 @@ end
 
 """
     ToolParameter(; name::String, type::String, description::String="", 
-                 required::Bool=false, constraints::Dict{String,Any}=Dict{String,Any}())
+                 required::Bool=false, constraints::AbstractDict{String,Any}=LittleDict{String,Any}())
 
 Define a parameter for an MCP tool.
 
@@ -62,14 +62,14 @@ Define a parameter for an MCP tool.
 - `type::String`: Type of the parameter as specified in the MCP schema
 - `description::String`: Human-readable description of the parameter
 - `required::Bool`: Whether the parameter is required for tool invocation
-- `constraints::Dict{String,Any}`: Optional constraints on parameter values
+- `constraints::AbstractDict{String,Any}`: Optional constraints on parameter values
 """
 Base.@kwdef struct ToolParameter
     name::String
     type::String
     description::String = ""
     required::Bool = false
-    constraints::Dict{String,Any} = Dict{String,Any}()
+    constraints::AbstractDict{String,Any} = LittleDict{String,Any}()
 end
 
 """
@@ -147,7 +147,7 @@ end
 """
     MCPResource(; uri::URI, name::String, description::String="",
               mime_type::String="application/json", data_provider::Function,
-              annotations::Dict{String,Any}=Dict{String,Any}()) <: Resource
+              annotations::AbstractDict{String,Any}=LittleDict{String,Any}()) <: Resource
 
 Implement a resource that clients can access in the MCP protocol.
 Resources represent data that can be read by models and tools.
@@ -158,7 +158,7 @@ Resources represent data that can be read by models and tools.
 - `description::String`: Detailed description of the resource
 - `mime_type::String`: MIME type of the resource data
 - `data_provider::Function`: Function that provides the resource data when called
-- `annotations::Dict{String,Any}`: Additional metadata for the resource
+- `annotations::AbstractDict{String,Any}`: Additional metadata for the resource
 """
 Base.@kwdef struct MCPResource <: Resource
     uri::URI
@@ -166,13 +166,13 @@ Base.@kwdef struct MCPResource <: Resource
     description::String = ""
     mime_type::String = "application/json"
     data_provider::Function
-    annotations::Dict{String,Any} = Dict{String,Any}()
+    annotations::AbstractDict{String,Any} = LittleDict{String,Any}()
 end
 
 """
     MCPResource(; uri::String, name::String="", description::String="",
               mime_type::String="application/json", data_provider::Function,
-              annotations::Dict{String,Any}=Dict{String,Any}()) -> MCPResource
+              annotations::AbstractDict{String,Any}=LittleDict{String,Any}()) -> MCPResource
 
 Create a resource with automatic URI conversion from strings.
 
@@ -182,7 +182,7 @@ Create a resource with automatic URI conversion from strings.
 - `description::String`: Detailed description
 - `mime_type::String`: MIME type of the resource
 - `data_provider::Function`: Function that returns the resource data when called
-- `annotations::Dict{String,Any}`: Additional metadata for the resource
+- `annotations::AbstractDict{String,Any}`: Additional metadata for the resource
 
 # Returns
 - `MCPResource`: A new resource with the provided configuration
@@ -192,7 +192,7 @@ function MCPResource(; uri::String,
     description::String = "", 
     mime_type::String = "application/json", 
     data_provider::Function, 
-    annotations::Dict{String,Any} = Dict{String,Any}())
+    annotations::AbstractDict{String,Any} = LittleDict{String,Any}())
     MCPResource(URI(uri), name, description, mime_type, data_provider, annotations)
 end
 
