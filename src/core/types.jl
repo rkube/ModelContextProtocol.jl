@@ -131,23 +131,23 @@ abstract type ResourceContents end
 # 3. Core concrete types
 
 """
-    TextContent(; text::String, annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+    TextContent(; text::String, annotations::AbstractDict{String,Any}=LittleDict{String,Any}()) <: Content
 
 Text-based content for MCP protocol messages.
 
 # Fields
 - `type::String`: Content type identifier (always "text")
 - `text::String`: The actual text content
-- `annotations::Dict{String,Any}`: Optional metadata about the content
+- `annotations::AbstractDict{String,Any}`: Optional metadata about the content
 """
 Base.@kwdef struct TextContent <: Content
     type::String = "text"  # Schema requires this to be const "text"
     text::String
-    annotations::Dict{String,Any} = Dict{String,Any}()
+    annotations::AbstractDict{String,Any} = LittleDict{String,Any}()
 end
 
 """
-    ImageContent(; data::Vector{UInt8}, mime_type::String, annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+    ImageContent(; data::Vector{UInt8}, mime_type::String, annotations::AbstractDict{String,Any}=LittleDict{String,Any}()) <: Content
 
 Image-based content for MCP protocol messages.
 
@@ -155,13 +155,13 @@ Image-based content for MCP protocol messages.
 - `type::String`: Content type identifier (always "image")
 - `data::Vector{UInt8}`: The binary image data
 - `mime_type::String`: MIME type of the image (e.g., "image/png")
-- `annotations::Dict{String,Any}`: Optional metadata about the content
+- `annotations::AbstractDict{String,Any}`: Optional metadata about the content
 """
 Base.@kwdef struct ImageContent <: Content
     type::String = "image"  # Schema requires this to be const "image"
     data::Vector{UInt8}
     mime_type::String
-    annotations::Dict{String,Any} = Dict{String,Any}()
+    annotations::AbstractDict{String,Any} = LittleDict{String,Any}()
 end
 
 """
@@ -198,19 +198,19 @@ end
 
 """
     EmbeddedResource(; resource::Union{TextResourceContents, BlobResourceContents}, 
-                    annotations::Dict{String,Any}=Dict{String,Any}()) <: Content
+                    annotations::AbstractDict{String,Any}=LittleDict{String,Any}()) <: Content
 
 Embedded resource content as defined in MCP schema.
 
 # Fields
 - `type::String`: Content type identifier (always "resource")
 - `resource::Union{TextResourceContents, BlobResourceContents}`: The embedded resource content
-- `annotations::Dict{String,Any}`: Optional metadata about the resource
+- `annotations::AbstractDict{String,Any}`: Optional metadata about the resource
 """
 Base.@kwdef struct EmbeddedResource <: Content
     type::String = "resource"  # Schema requires this to be const "resource"
     resource::Union{TextResourceContents, BlobResourceContents}
-    annotations::Dict{String,Any} = Dict{String,Any}()
+    annotations::AbstractDict{String,Any} = LittleDict{String,Any}()
 end
 
 """

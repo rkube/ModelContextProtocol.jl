@@ -42,6 +42,35 @@ Base.@kwdef struct HandlerResult
 end
 
 """
+    serialize_resource_contents(resource::ResourceContents) -> Dict{String,Any}
+
+Serialize resource contents to protocol format.
+
+# Arguments
+- `resource::ResourceContents`: The resource contents to serialize
+
+# Returns
+- `Dict{String,Any}`: The serialized resource contents
+"""
+function serialize_resource_contents(resource::ResourceContents)
+    if resource isa TextResourceContents
+        LittleDict{String,Any}(
+            "uri" => resource.uri,
+            "text" => resource.text,
+            "mimeType" => resource.mime_type
+        )
+    elseif resource isa BlobResourceContents
+        LittleDict{String,Any}(
+            "uri" => resource.uri,
+            "blob" => base64encode(resource.blob),
+            "mimeType" => resource.mime_type
+        )
+    else
+        throw(ArgumentError("Unknown resource contents type: $(typeof(resource))"))
+    end
+end
+
+"""
     convert_to_content_type(result::Any, return_type::Type) -> Content
 
 Convert various return types to the appropriate MCP Content type.
@@ -59,7 +88,7 @@ function convert_to_content_type(result::Any, return_type::Type)
         return TextContent(
             type = "text",
             text = JSON3.write(result),
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -68,7 +97,7 @@ function convert_to_content_type(result::Any, return_type::Type)
         return TextContent(
             type = "text",
             text = result,
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -79,7 +108,7 @@ function convert_to_content_type(result::Any, return_type::Type)
             type = "image",
             data = data,
             mime_type = mime_type,
-            annotations = Dict{String,Any}()
+            annotations = LittleDict{String,Any}()
         )
     end
     
@@ -141,7 +170,7 @@ function handle_ping(ctx::RequestContext, ::Nothing)::HandlerResult
     HandlerResult(
         response=JSONRPCResponse(
             id=ctx.request_id,
-            result=Dict{String,Any}()
+            result=LittleDict{String,Any}()
         )
     )
 end
@@ -161,10 +190,10 @@ Handle requests to list available prompts on the MCP server.
 function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::HandlerResult
     try
         prompts = map(ctx.server.prompts) do prompt::MCPPrompt
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "name" => prompt.name,
                 "description" => prompt.description,
-                "arguments" => [Dict{String,Any}(
+                "arguments" => [LittleDict{String,Any}(
                     "name" => arg.name,
                     "description" => arg.description,
                     "required" => arg.required
@@ -172,7 +201,7 @@ function handle_list_prompts(ctx::RequestContext, params::ListPromptsParams)::Ha
             )
         end
 
-        result = Dict{String,Any}(
+        result = LittleDict{String,Any}(
             "prompts" => prompts
         )
 
@@ -291,7 +320,7 @@ function handle_get_prompt(ctx::RequestContext, params::GetPromptParams)::Handle
         end
 
         # Get the arguments (empty dict if none provided)
-        args = params.arguments isa Nothing ? Dict{String,String}() : params.arguments
+        args = params.arguments isa Nothing ? LittleDict{String,String}() : params.arguments
 
         # Process messages with template processor
         processed_messages = map(prompt.messages) do msg
@@ -348,12 +377,12 @@ Handle requests to list all available resources on the MCP server.
 function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)::HandlerResult
     try
         resources = map(ctx.server.resources) do resource::MCPResource
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "uri" => string(resource.uri),
                 "name" => resource.name,
                 "mimeType" => resource.mime_type,
                 "description" => resource.description,
-                "annotations" => Dict{String,Any}(
+                "annotations" => LittleDict{String,Any}(
                     "audience" => get(resource.annotations, "audience", ["assistant"]),
                     "priority" => get(resource.annotations, "priority", 0.0)
                 )
@@ -361,7 +390,7 @@ function handle_list_resources(ctx::RequestContext, params::ListResourcesParams)
         end
 
         # Create the result dictionary explicitly
-        result_dict = Dict{String,Any}(
+        result_dict = LittleDict{String,Any}(
             "resources" => resources
         )
 
@@ -433,7 +462,7 @@ function handle_read_resource(ctx::RequestContext, params::ReadResourceParams)::
     try
         data = resource.data_provider()
         
-        contents = [Dict{String,Any}(
+        contents = [LittleDict{String,Any}(
             "uri" => string(resource.uri),
             "text" => JSON3.write(data),
             "mimeType" => resource.mime_type
@@ -486,33 +515,63 @@ function handle_call_tool(ctx::RequestContext, params::CallToolParams)::HandlerR
     tool = ctx.server.tools[tool_idx]
 
     try
+        # Apply default values to arguments if not provided
+        args = isnothing(params.arguments) ? LittleDict{String,Any}() : copy(params.arguments)
+        
+        # Apply defaults for parameters that have them
+        for param in tool.parameters
+            if !isnothing(param.default) && !haskey(args, param.name)
+                args[param.name] = param.default
+            end
+        end
+        
         # Call the tool handler with the arguments
-        result = tool.handler(params.arguments)
+        result = tool.handler(args)
+        
+        # Check if the handler returned a complete CallToolResult
+        if result isa CallToolResult
+            # Handler returned a complete result, use it directly
+            return HandlerResult(
+                response=JSONRPCResponse(
+                    id=ctx.request_id,
+                    result=result
+                )
+            )
+        end
         
         # Apply automatic conversion to the expected return type
         result = convert_to_content_type(result, tool.return_type)
 
+        # Check if result is a vector of content or single content
+        is_vector = result isa Vector && all(x -> x isa Content, result)
+        
         # Validate return type matches what's declared
-        if !(result isa tool.return_type)
-            throw(ArgumentError("Tool returned $(typeof(result)), expected $(tool.return_type)"))
+        if is_vector
+            # Check if return type accepts vectors of content
+            # We need to check if the actual type or Vector{Content} is accepted
+            if !(typeof(result) <: tool.return_type) && !(Vector{Content} <: tool.return_type)
+                throw(ArgumentError("Tool returned $(typeof(result)), but return_type is $(tool.return_type)"))
+            end
+        elseif result isa Content
+            # Single content - check if it matches declared type or if Vector was expected
+            if tool.return_type <: Vector
+                # If Vector was expected but single content returned, wrap it
+                result = [result]
+                is_vector = true
+            elseif !(result isa tool.return_type)
+                throw(ArgumentError("Tool returned $(typeof(result)), expected $(tool.return_type)"))
+            end
+        else
+            throw(ArgumentError("Tool must return Content or Vector{<:Content}, got $(typeof(result))"))
         end
 
         # Convert content to protocol format
-        content = if result isa ImageContent
-            [Dict{String,Any}(
-                "type" => "image",
-                "data" => base64encode(result.data),
-                "mimeType" => result.mime_type,
-                "annotations" => result.annotations
-            )]
-        elseif result isa TextContent
-            [Dict{String,Any}(
-                "type" => "text",
-                "text" => result.text,
-                "annotations" => result.annotations
-            )]
+        content = if is_vector
+            # Handle vector of content items
+            map(content2dict, result)
         else
-            throw(ArgumentError("Unsupported content type: $(typeof(result))"))
+            # Handle single content item (backward compatibility)
+            [content2dict(result)]
         end
 
         HandlerResult(
@@ -549,23 +608,30 @@ Handle requests to list all available tools on the MCP server.
 function handle_list_tools(ctx::RequestContext, params::ListToolsParams)::HandlerResult
     try
         tools = map(ctx.server.tools) do tool
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "name" => tool.name,
                 "description" => tool.description,
-                "inputSchema" => Dict{String,Any}(
+                "inputSchema" => LittleDict{String,Any}(
                     "type" => "object",
                     "properties" => Dict(
-                        param.name => Dict{String,Any}(
-                            "type" => param.type,
-                            "description" => param.description
-                        ) for param in tool.parameters
+                        param.name => begin
+                            schema = LittleDict{String,Any}(
+                                "type" => param.type,
+                                "description" => param.description
+                            )
+                            # Add default value to schema if it exists
+                            if !isnothing(param.default)
+                                schema["default"] = param.default
+                            end
+                            schema
+                        end for param in tool.parameters
                     ),
                     "required" => [p.name for p in tool.parameters if p.required]
                 )
             )
         end
 
-        result = Dict{String,Any}(
+        result = LittleDict{String,Any}(
             "tools" => tools
         )
 
@@ -652,15 +718,21 @@ function handle_request(server::Server, request::Request)::Response
             elseif request.method == "ping"
                 handle_ping(ctx, request.params::Nothing)
             elseif request.method == "resources/list"
-                handle_list_resources(ctx, request.params::ListResourcesParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListResourcesParams() : request.params::ListResourcesParams
+                handle_list_resources(ctx, params)
             elseif request.method == "resources/read"
                 handle_read_resource(ctx, request.params::ReadResourceParams)
             elseif request.method == "tools/call"
                 handle_call_tool(ctx, request.params::CallToolParams)
             elseif request.method == "tools/list"
-                handle_list_tools(ctx, request.params::ListToolsParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListToolsParams() : request.params::ListToolsParams
+                handle_list_tools(ctx, params)
             elseif request.method == "prompts/list"
-                handle_list_prompts(ctx, request.params::ListPromptsParams)
+                # Handle null params from clients like Cursor
+                params = isnothing(request.params) ? ListPromptsParams() : request.params::ListPromptsParams
+                handle_list_prompts(ctx, params)
             elseif request.method == "prompts/get"
                 handle_get_prompt(ctx, request.params::GetPromptParams)
             else

@@ -159,9 +159,9 @@ function parse_notification(raw::JSON3.Object)::Notification
     method = raw.method
     params = if haskey(raw, :params)
         # Handle empty params object case
-        isempty(raw.params) ? Dict{String,Any}() : raw.params
+        isempty(raw.params) ? LittleDict{String,Any}() : raw.params
     else
-        Dict{String,Any}() 
+        LittleDict{String,Any}() 
     end
     
     # Parse method-specific parameters
@@ -250,7 +250,7 @@ Serialize an MCP message object into a JSON-RPC compliant string.
 """
 function serialize_message(msg::MCPMessage)::String
     if msg isa JSONRPCRequest
-        dict = Dict{String,Any}(
+        dict = LittleDict{String,Any}(
             "jsonrpc" => "2.0",
             "id" => msg.id,
             "method" => msg.method
@@ -264,10 +264,10 @@ function serialize_message(msg::MCPMessage)::String
         # Add metadata if present
         if !isnothing(msg.meta.progress_token)
             if !haskey(dict, "params")
-                dict["params"] = Dict{String,Any}()
+                dict["params"] = LittleDict{String,Any}()
             end
             if dict["params"] isa Dict
-                dict["params"]["_meta"] = Dict{String,Any}(
+                dict["params"]["_meta"] = LittleDict{String,Any}(
                     "progressToken" => msg.meta.progress_token
                 )
             end
@@ -276,21 +276,21 @@ function serialize_message(msg::MCPMessage)::String
         return JSON3.write(dict)
         
     elseif msg isa JSONRPCResponse
-        return JSON3.write(Dict{String,Any}(
+        return JSON3.write(LittleDict{String,Any}(
             "jsonrpc" => "2.0",
             "id" => msg.id,
             "result" => msg.result
         ))
         
     elseif msg isa JSONRPCError
-        return JSON3.write(Dict{String,Any}(
+        return JSON3.write(LittleDict{String,Any}(
             "jsonrpc" => "2.0",
             "id" => msg.id,
             "error" => msg.error
         ))
         
     elseif msg isa JSONRPCNotification
-        dict = Dict{String,Any}(
+        dict = LittleDict{String,Any}(
             "jsonrpc" => "2.0",
             "method" => msg.method
         )

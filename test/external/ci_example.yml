@@ -1,0 +1,54 @@
+# Example GitHub Actions workflow for running external integration tests
+# Copy this to .github/workflows/external-tests.yml to use
+
+name: External Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        julia-version: ['1.10', '1.11']
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Julia ${{ matrix.julia-version }}
+      uses: julia-actions/setup-julia@v2
+      with:
+        version: ${{ matrix.julia-version }}
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r test/external/requirements.txt
+    
+    - name: Install Julia dependencies
+      run: |
+        julia --project=. -e 'using Pkg; Pkg.instantiate()'
+        julia --project=test/external -e 'using Pkg; Pkg.instantiate()'
+    
+    - name: Run external integration tests
+      run: |
+        julia --project=test/external test/external/runtests.jl
+      env:
+        JULIA_NUM_THREADS: 2
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: test-results-${{ matrix.julia-version }}-${{ matrix.python-version }}
+        path: test/external/*.log

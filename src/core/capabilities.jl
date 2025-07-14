@@ -60,26 +60,26 @@ Convert an MCP capability to the JSON format expected by the MCP protocol.
 - `Dict{String,Any}`: Protocol-formatted capability dictionary.
 """
 function to_protocol_format(cap::ResourceCapability)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "listChanged" => cap.list_changed,
         "subscribe" => cap.subscribe
     )
 end
 
 function to_protocol_format(cap::ToolCapability)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "listChanged" => cap.list_changed
     )
 end
 
 function to_protocol_format(cap::PromptCapability)
-    Dict{String,Any}(
+    LittleDict{String,Any}(
         "listChanged" => cap.list_changed
     )
 end
 
 function to_protocol_format(cap::LoggingCapability)
-    Dict{String,Any}()  # Logging capability just needs to be present
+    LittleDict{String,Any}()  # Logging capability just needs to be present
 end
 
 """
@@ -117,57 +117,35 @@ Convert server capabilities to the initialization response format required by th
 - `Dict{String,Any}`: Protocol-formatted capabilities dictionary including available tools and resources.
 """
 function capabilities_to_protocol(capabilities::Vector{Capability}, server::Server)::Dict{String,Any}
-    result = Dict{String,Any}()
+    result = LittleDict{String,Any}()
     
     # First add base capability flags
     for cap in capabilities
         if cap isa ResourceCapability
-            result["resources"] = Dict{String,Any}(
+            result["resources"] = LittleDict{String,Any}(
                 "listChanged" => cap.list_changed,
                 "subscribe" => cap.subscribe
             )
         elseif cap isa ToolCapability
-            result["tools"] = Dict{String,Any}(
+            result["tools"] = LittleDict{String,Any}(
                 "listChanged" => cap.list_changed
             )
         elseif cap isa PromptCapability
-            result["prompts"] = Dict{String,Any}(
+            result["prompts"] = LittleDict{String,Any}(
                 "listChanged" => cap.list_changed
             )
         elseif cap isa LoggingCapability
-            result["logging"] = Dict{String,Any}()
+            result["logging"] = LittleDict{String,Any}()
         end
     end
     
-    # Then add available tools under their names
-    if haskey(result, "tools") && !isempty(server.tools)
-        tools_dict = result["tools"]  # Get existing dict with listChanged
-        result["tools"] = Dict{String,Any}(
-            "listChanged" => tools_dict["listChanged"]  # Put listChanged first
-        )
-        # Then add tools
-        for tool in server.tools
-            result["tools"][tool.name] = Dict{String,Any}(
-                "name" => tool.name,
-                "description" => tool.description,
-                "inputSchema" => Dict{String,Any}(
-                    "type" => "object",
-                    "properties" => Dict(
-                        param.name => Dict{String,Any}(
-                            "type" => param.type,
-                            "description" => param.description
-                        ) for param in tool.parameters
-                    ),
-                    "required" => [p.name for p in tool.parameters if p.required]
-                )
-            )
-        end
-    end
+    # Note: Tools are NOT included in the initialization response per MCP spec
+    # They should only be returned via the tools/list request
 
     # Add available resources array
     if haskey(result, "resources") && !isempty(server.resources)
         result["resources"]["resources"] = map(server.resources) do resource
-            Dict{String,Any}(
+            LittleDict{String,Any}(
                 "uri" => string(resource.uri),
                 "name" => resource.name,
                 "mimeType" => resource.mime_type,

@@ -1,6 +1,6 @@
 module ModelContextProtocol
 
-using JSON3, URIs, DataStructures, Logging, Dates, StructTypes, MacroTools, Base64
+using JSON3, URIs, DataStructures, OrderedCollections, Logging, Dates, StructTypes, MacroTools, Base64
 
 # 1. Foundation
 include("core/types.jl")
@@ -82,6 +82,7 @@ export
     # Utils
     MCPLogger, init_logging,
     ErrorCodes,  # Export error codes module
+    content2dict,  # Export content serialization function
 
     # Handlers
     HandlerResult, RequestContext
