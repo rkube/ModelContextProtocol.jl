@@ -9,6 +9,52 @@
 - REPL: `using ModelContextProtocol` after activating project
 - Example server: `julia --project examples/multi_content_tool.jl`
 
+## Integration Tests
+
+Integration tests with external MCP clients (Python SDK) are located in `dev/integration_tests/`. These tests are separate from the main test suite and require additional setup:
+
+### Running Integration Tests
+
+1. **Setup the integration test environment**:
+   ```bash
+   cd dev/integration_tests
+   julia --project -e 'using Pkg; Pkg.instantiate()'
+   pip install -r requirements.txt
+   ```
+
+2. **Run individual integration tests**:
+   ```bash
+   # Basic STDIO communication test
+   julia --project test_basic_stdio.jl
+   
+   # Full integration test with Python MCP client
+   julia --project test_integration.jl
+   
+   # Python client compatibility test
+   julia --project test_python_client.jl
+   ```
+
+3. **Run all integration tests**:
+   ```bash
+   julia --project runtests.jl
+   ```
+
+### What Integration Tests Cover
+
+- **STDIO Protocol**: Tests bidirectional JSON-RPC communication over stdio
+- **Python Client Compatibility**: Validates that Julia MCP servers work with the official Python MCP SDK
+- **Real Protocol Compliance**: End-to-end testing with actual MCP clients
+- **Cross-Language Interoperability**: Ensures the Julia implementation follows the MCP specification correctly
+
+### When to Run Integration Tests
+
+- Before releasing new versions
+- When making protocol-level changes
+- When adding new MCP features
+- For debugging client compatibility issues
+
+**Note**: Integration tests are not run automatically in CI and require manual execution due to their external Python dependencies.
+
 ## Project Structure
 ```
 src/
