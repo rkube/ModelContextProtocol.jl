@@ -1,3 +1,49 @@
+"""
+    ModelContextProtocol
+
+Julia implementation of the Model Context Protocol (MCP), enabling standardized
+communication between AI applications and external tools, resources, and data sources.
+
+# Quick Start
+
+Create and start an MCP server:
+
+```julia
+using ModelContextProtocol
+
+# Create a simple server with a tool
+server = mcp_server(
+    name = "my-server",
+    tools = [
+        MCPTool(
+            name = "hello",
+            description = "Say hello",
+            parameters = [],
+            handler = (p) -> TextContent(text = "Hello, world!")
+        )
+    ]
+)
+
+start!(server)
+```
+
+# API Overview
+
+For a comprehensive overview of the API, use the help mode on `api`:
+
+    ?ModelContextProtocol.api
+
+Or access the complete API documentation programmatically:
+
+    docs = ModelContextProtocol.api()
+
+# See Also
+
+- `mcp_server` - Create an MCP server instance
+- `MCPTool` - Define tools that can be invoked by clients
+- `MCPResource` - Define resources that can be accessed by clients
+- `MCPPrompt` - Define prompt templates for LLMs
+"""
 module ModelContextProtocol
 
 using JSON3, URIs, DataStructures, OrderedCollections, Logging, Dates, StructTypes, MacroTools, Base64
@@ -29,6 +75,9 @@ include("protocol/handlers.jl")
 
 # 7. Serialization (needs all types)
 include("utils/serialization.jl")
+
+# 8. API documentation
+include("api.jl")
 
 # Export all public interfaces
 export 
