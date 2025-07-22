@@ -1,11 +1,3 @@
-# test_content2dict.jl
-
-using Test
-using ModelContextProtocol
-using ModelContextProtocol: content2dict, serialize_resource_contents
-using Base64: base64encode
-using OrderedCollections: LittleDict
-
 @testset "content2dict function" begin
     @testset "TextContent conversion" begin
         # Basic text content

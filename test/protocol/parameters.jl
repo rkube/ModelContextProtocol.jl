@@ -1,7 +1,3 @@
-using Test
-using ModelContextProtocol
-using JSON3
-
 @testset "Null Parameters Handling" begin
     # Create a simple server with a tool
     test_tool = MCPTool(
