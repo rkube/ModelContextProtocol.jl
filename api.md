@@ -119,7 +119,8 @@ calculator = MCPTool(
     handler = function(params)
         expr = params["expression"]
         precision = params["precision"]
-        result = eval(Meta.parse(expr))
+        # Note: In production, use a safe expression parser instead of eval
+        result = Base.eval(Main, Meta.parse(expr))
         return TextContent(text = "Result: $(round(result, digits=Int(precision)))")
     end
 )
@@ -235,7 +236,7 @@ multiply_tool = MCPTool(
 
 #### 2. **Auto-Registration Implementation**
 
-The system works by scanning `.jl` files and looking for variables of the correct types (src/core/init.jl:100-140):
+The system works by scanning `.jl` files and looking for variables of the correct types:
 
 ```julia
 function auto_register!(server::Server, dir::AbstractString)
@@ -336,6 +337,8 @@ Resource (abstract)
 └── MCPResource          # Has: uri::URI, name, description, mime_type, data_provider, annotations
 
 MCPPrompt                # Has: name, description, arguments, messages (NO handler - static templates)
+PromptArgument          # Has: name, description, required
+PromptMessage           # Has: content, role
 
 ResponseResult (abstract)
 └── CallToolResult       # Has: content::Vector{Dict{String,Any}}, is_error::Bool (NO metadata field)
@@ -356,10 +359,10 @@ end
 
 Base.@kwdef struct ToolParameter
     name::String                    # Parameter name
-    description::String             # Parameter description (required field) - MUST come before type
+    description::String             # Parameter description
     type::String                    # JSON Schema type ("string", "number", "boolean", "object", "array")
     required::Bool = false          # Whether parameter is required
-    default::Any = nothing          # Default value (v0.2+)
+    default::Any = nothing          # Default value if not provided
 end
 ```
 
@@ -801,7 +804,7 @@ using ModelContextProtocol
 # Create server with auto-registration
 server = mcp_server(
     name = "file-management-server",
-    version = "1.0.0",
+    version = "2024-11-05",
     description = "Comprehensive file management MCP server",
     auto_register_dir = "mcp_components"
 )
